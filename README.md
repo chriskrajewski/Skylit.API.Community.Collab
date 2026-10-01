@@ -1,23 +1,9 @@
-<p align="center">
-  <a href="https://www.skylit.ai">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="brand/skylit-lockup-dark.png">
-      <source media="(prefers-color-scheme: light)" srcset="brand/skylit-lockup-light.png">
-      <img alt="Skylit" src="brand/skylit-lockup-light.png" width="420">
-    </picture>
-  </a>
-</p>
+![Skylit](brand/skylit-lockup-light.png)
 
-<h1 align="center">Community collaboration hub</h1>
+# Community developer collaboration hub
 
-<p align="center">
-  Shared agents, APIs, and MCP projects built on Skylit.<br>
-  <a href="https://www.skylit.ai">skylit.ai</a>
-  ·
-  <a href="https://docs.skylit.ai">Docs</a>
-  ·
-  <a href="https://www.skylit.ai/brand-assets">Brand library</a>
-</p>
+Shared agents, APIs, and MCP projects built on Skylit.  
+[skylit.ai](https://www.skylit.ai) · [Docs](https://docs.skylit.ai) · [Brand library](https://www.skylit.ai/brand-assets)
 
 This repository is a shared shelf for the Skylit community. Members share AI agents, APIs, and MCP projects built on Skylit data. The account that hosts the repository holds the files. Each project belongs to the member who shared it.
 
@@ -70,4 +56,3 @@ Hub documentation and the blank template are dedicated under [CC0](LICENSE). A p
 - [LICENSE](LICENSE)
 
 The Skylit name and Satin Graphite lockup belong to Skylit, Inc. The files in [brand/](brand/) are the official horizontal lockup, used intact. This hub does not make a community project a Skylit product.
-
