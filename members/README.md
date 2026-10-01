@@ -13,5 +13,5 @@
 Each member has one folder, `members/<discord-username>/`, and a page at `members/<discord-username>/README.md` that lists only their projects. When your first project is ready, add a link here, in alphabetical order by Discord username:
 
 ```markdown
-- [alantiix](alantiix/README.md)
+[alantiix](alantiix/README.md)
 ```
