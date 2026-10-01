@@ -1,0 +1,25 @@
+{
+  "id": "RAINBOW_ROAD",
+  "name": "Rainbow Road (VEX Regime / Trending Day)",
+  "category": "Trend/Volatility",
+  "setup": "VEX (Vanna Exposure) magnitude significantly exceeds GEX magnitude. VIX is elevated or spiking. In this regime, GEX levels lose reliability and VEX nodes (especially distant ones) become the dominant magnets. Trending day \u2014 not a mean-reversion day.",
+  "entry": "Trade in the trend direction. If bearish VEX regime: short the pops, don't buy the dips. If bullish: buy dips, don't short the rips. Size bigger on momentum \u2014 this is a trending environment, not a range.",
+  "exit": "Target distant VEX nodes that 'come back to life' as price approaches. These nodes were dormant (delta-decayed) but re-activate aggressively when price returns to their level. Exit when price reaches the VEX target.",
+  "probability": "Most reliable when VIX has been at floor and is expanding (range expansion signal).",
+  "key_rules": [
+    "VEX overrides GEX during volatility spikes \u2014 GEX floors/ceilings become unreliable",
+    "Node Delta Decay / Coming Back to Life: nodes seem gone but re-activate on price return",
+    "Pro-cyclicality amplified: purple nodes in VEX regime create violent feedback loops",
+    "Vanna/Charm Drift: mid-day natural drift up if vol is compressing (dealer hedge buyback)"
+  ],
+  "edge_cases": [
+    "Window of Weakness: end-of-quarter rebalancing makes Buy-the-Dip fail",
+    "VIX Floor Signal: VIX at bottom of weekly range = high probability of vol expansion",
+    "News as Catalyst: large Hedge Nodes often precede news events (dealers/insiders position early)"
+  ],
+  "sources": [
+    "SPX 3000% Crash \u2014 VEX Taking Control",
+    "Heatseeker 104 \u2014 Window of Weakness, VIX Range Expansion",
+    "PATTERN: Rainbow Road (Patternpedia)"
+  ]
+}

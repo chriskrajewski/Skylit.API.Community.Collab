@@ -1,0 +1,25 @@
+{
+  "id": "FLOOR_BOUNCE",
+  "name": "Floor Bounce / Empty Basement",
+  "category": "Support/Reversal",
+  "setup": "Price hits a major floor node (negative GEX) with zero significant nodes underneath \u2014 the 'Empty Basement.' SPY/QQQ at hard floors with no downside volume. Cross-reference Heatseeker node with chart structural levels for confluence.",
+  "entry": "Limit buy as price taps the floor node. If you miss the initial touch, wait for the 'Retest Entry' \u2014 price pumps, then retests the level. Enter at the start of the strong candle following the retrace. Scale-in: 25-50% starter at \u00b15 points, full size on deeper dip.",
+  "exit": "Trim 1: 30% immediately on first sharp reaction. Trim 2: another 50% after first pullback holds and new highs print. Hold runners if 61.8-79% Fibonacci retracement (Golden Zone) holds.",
+  "probability": "High when 2-of-3 Trinity members show floor with empty basement below.",
+  "key_rules": [
+    "Empty Basement Rule: no nodes below floor = hard floor, even if SPX shows lower magnets",
+    "2-of-3 Trinity Filter: if SPY+QQQ hold floors, SPX bearish magnet is overruled",
+    "Node Dissolve: after bounce, floor node should SHRINK \u2014 if it grows, bounce is fake (Bearish Divergence)",
+    "Clear Skies: no upside nodes after floor bounce = no resistance = 'Full Send' reversal"
+  ],
+  "edge_cases": [
+    "Divergence Acceptance: if strongest ticker (QQQ) holds floor, trade is valid even if SPY lags",
+    "Structural Confluence: Heatseeker floor + chart history level = higher conviction",
+    "Use credit spreads on the index with the 'scary' magnet for defined risk"
+  ],
+  "sources": [
+    "Floor Bounce Recap (Jan 14, 2026)",
+    "Heatseeker 106 \u2014 Clear Skies Reversal",
+    "0DTE Sniping Masterclass \u2014 Beach Ball Reversal"
+  ]
+}

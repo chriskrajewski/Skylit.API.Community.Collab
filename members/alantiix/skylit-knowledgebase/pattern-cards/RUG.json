@@ -1,0 +1,24 @@
+{
+  "id": "RUG",
+  "name": "Rug Pull Setup",
+  "category": "Breakdown",
+  "setup": "Positive GEX (yellow) node stacked directly above a negative GEX (purple/Barney) node, with no obvious floor below. The positive node acts as a temporary ceiling; the underlying negative node is pro-cyclical \u2014 if price breaks below, dealer selling accelerates the flush.",
+  "entry": "Short when price rejects the yellow ceiling node. Limit sell into the green candle pop. Target: the negative node below. If price breaks the purple node, hold \u2014 no floor means 'air pocket' free-fall mode.",
+  "exit": "Cover at the next significant node below, or if price enters a void zone (no nodes), ride until a floor appears. Use \u00b15 point (SPX) / \u00b1$0.50 (SPY) overshoot margin before declaring the level broken.",
+  "probability": "High conviction when Trinity (SPX/SPY/QQQ) all show same yellow-over-purple config.",
+  "key_rules": [
+    "Pro-cyclicality: purple nodes accelerate moves (selling begets more selling)",
+    "Air Pockets: no nodes below = free-fall, no support to catch price",
+    "VEX Override: during VIX spikes, VEX overrides GEX \u2014 distant nodes become magnetic",
+    "Node growth during break = real breakdown, not fakeout"
+  ],
+  "edge_cases": [
+    "If the purple node's value DECREASES during the break, it may be a liquidity hunt (fakeout)",
+    "VEX can override GEX during high-vol events \u2014 check VIX regime"
+  ],
+  "sources": [
+    "SPX 3000% Crash Case Study",
+    "PATTERN: RUG SETUP (Patternpedia)",
+    "Heatseeker 101 \u2014 Breakout Trap"
+  ]
+}

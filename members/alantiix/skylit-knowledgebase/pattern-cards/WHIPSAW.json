@@ -1,0 +1,23 @@
+{
+  "id": "WHIPSAW",
+  "name": "Whipsaw Range Trade",
+  "category": "Range/Mean-Reversion",
+  "setup": "Price is trapped between two opposing GEX nodes of roughly equal absolute strength (within 10-15% magnitude). Example: -75M node at 6485 vs -80M node at 6500. Price ping-pongs between them.",
+  "entry": "Short at the upper node, long at the lower node. Use limit orders only \u2014 lowball the bid by $0.10-$0.20. Enter on red candles into floor, green candles into ceiling. Never use market orders.",
+  "exit": "Sell into the opposing node. Do NOT hold for breakout. Scale partials at the first Gatekeeper node encountered.",
+  "probability": "~66% probability of holding on tests 1 and 2. 3rd test has significantly higher probability of breaking through.",
+  "key_rules": [
+    "Absolute Value Rule: sign matters less than magnitude (-80M > +20M)",
+    "Plus/Minus 5: allow \u00b15 point (SPX) variance before declaring trade failed",
+    "Liquidity Hunt: price often hunts 3-5 points below node before reversal",
+    "Size is Stop: no hard stops on 0DTE \u2014 position size is risk management"
+  ],
+  "edge_cases": [
+    "If one node's magnitude grows while the other shrinks, the range is breaking",
+    "V-Shape Liquidity Hunt: break below node but node value INCREASES = fakeout, enter reversal"
+  ],
+  "sources": [
+    "Heatseeker 101 \u2014 Whipsaw Range Trade",
+    "PATTERN: The Whipsaw (Patternpedia)"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "id": "REVERSE_RUG",
+  "name": "Reverse Rug / Slingshot",
+  "category": "Breakout/Rally",
+  "setup": "Negative GEX (purple) stacked above positive GEX (yellow) \u2014 the inverse of a Rug Pull. Price is rejected at the ceiling and drops into the positive GEX floor below. When VIX falls and price holds above the yellow floor, dealer buying accelerates. If the path above is clear (no intermediate junk nodes), it becomes a high-velocity slingshot launch toward the King strike.",
+  "entry": "Long when price holds above the positive GEX (yellow) floor node after rejecting the purple ceiling. Buy calls at or near the yellow floor. Look for 'Clear Skies' above \u2014 zero upside nodes means zero resistance, enabling a full-send rally.",
+  "exit": "Target the King strike as the primary magnet. If 'Clear Skies' (no upside nodes), let runners ride \u2014 no walls exist to stop the squeeze. Scale out in thirds: 30% at first Gatekeeper, 40% at King, hold 30% for overshoot.",
+  "probability": "High conviction when VIX is falling + positive GEX floor holds + no intermediate resistance nodes ('Clear Skies'). LLY case study: 750 floor to 800 King with zero junk nodes = minutes, not hours.",
+  "key_rules": [
+    "Inverse structure of Rug Pull: purple above yellow instead of yellow above purple",
+    "Clear Skies = no upside nodes = no resistance = most violent reversal type",
+    "No friction (zero intermediate nodes) = no pullbacks = slingshot velocity",
+    "VIX declining + positive GEX floor holding = dealer buying accelerates the move"
+  ],
+  "edge_cases": [
+    "If upside nodes DO exist between floor and King, the move will stall at each one \u2014 trade more conservatively",
+    "Verify the yellow floor node's value is stable or growing; if it's shrinking, the floor is dissolving"
+  ],
+  "sources": [
+    "Heatseeker Trading Manual v13 \u2014 Chapter 13.2: Reverse Rug (Slingshot)",
+    "Heatseeker Trading Manual v13 \u2014 Chapter 13.3: Clear Skies Reversal",
+    "LLY 750\u2192800 Slingshot Case Study"
+  ]
+}

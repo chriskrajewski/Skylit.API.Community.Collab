@@ -1,0 +1,24 @@
+{
+  "id": "BEACH_BALL",
+  "name": "Beach Ball Reversal (Negative GEX Pit)",
+  "category": "Reversal",
+  "setup": "Price drops into a major negative GEX (purple) node cluster \u2014 a 'pit' of negative gamma. As puts go ITM, gamblers cash out, forcing dealers to buy back short hedges. This creates a 'trampoline effect' that launches price back up (the 'Beach Ball').",
+  "entry": "Limit buys (lowball the bid) as price taps the negative GEX pit. Enter on red candles into the node. Never chase \u2014 never use market orders. Minimum 3:1 R/R filter: measure risk to upside node vs distance to downside. Example: 10 pts risk up vs 55 pts potential down = 5.5:1.",
+  "exit": "Scale out partials at the first Gatekeeper node above. Hold runners if the 61.8-79% Fibonacci Golden Zone holds. If 'Clear Skies' (no upside resistance nodes), let it run.",
+  "probability": "High when VIX is elevated (Vanna acceleration) and Trinity shows floor confluence.",
+  "key_rules": [
+    "Trampoline Effect: ITM puts being closed \u2192 dealer hedge buyback \u2192 price reversal",
+    "3:1 Minimum R/R: never enter without asymmetric payoff",
+    "VIX Confluence: VIX 'hollow candles' (overheating) + -GEX floor = max bounce probability",
+    "Node Rate of Change: if pit node grows 20%+ in velocity, it's becoming THE magnet"
+  ],
+  "edge_cases": [
+    "VEX Override: during VIX spikes, VEX takes control \u2014 distant VEX nodes become magnetic, potentially pulling price THROUGH the GEX pit",
+    "3rd Touch: if floor was already tested 2x, probability of break-through increases"
+  ],
+  "sources": [
+    "0DTE Sniping Masterclass \u2014 Beach Ball Reversal",
+    "Heatseeker 101 \u2014 V-Shape Liquidity Hunt",
+    "SPX 3000% Crash \u2014 VEX Taking Control"
+  ]
+}
