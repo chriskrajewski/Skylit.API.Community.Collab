@@ -1,0 +1,28 @@
+name: Question
+description: Ask about the hub or about a shared project.
+title: "question: "
+labels:
+  - question
+body:
+  - type: input
+    id: discord
+    attributes:
+      label: Discord username
+      description: Your Discord username, so people can find you in the Skylit Discord.
+      placeholder: alice
+    validations:
+      required: true
+  - type: input
+    id: project-id
+    attributes:
+      label: Project identifier
+      description: Fill this in when the question is about a specific project. Leave it empty for a question about the hub.
+      placeholder: flow-sweep-agent
+    validations:
+      required: false
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+    validations:
+      required: true

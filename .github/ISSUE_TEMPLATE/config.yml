@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Contributing guide
+    url: https://github.com/chriskrajewski/Skylit.API.Community.Collab/blob/main/CONTRIBUTING.md
+    about: How to add a project under your Discord username.
