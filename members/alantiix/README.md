@@ -1,4 +1,4 @@
-# discord_username
+# alantiix
 
 - Discord username: alantiix
 
