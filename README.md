@@ -1,9 +1,17 @@
-![Skylit](brand/skylit-lockup-light.png)
+<p align="center">
+  <img alt="Skylit" src="brand/skylit-lockup-light.png" width="420">
+</p>
 
-# Community developer collaboration hub
+<h1 align="center">Community developer collaboration hub</h1>
 
-Shared agents, APIs, and MCP projects built on Skylit.  
-[skylit.ai](https://www.skylit.ai) · [Docs](https://docs.skylit.ai) · [Brand library](https://www.skylit.ai/brand-assets)
+<p align="center">
+  Shared agents, APIs, and MCP projects built on Skylit.<br>
+  <a href="https://www.skylit.ai">skylit.ai</a>
+  ·
+  <a href="https://docs.skylit.ai">Docs</a>
+  ·
+  <a href="https://www.skylit.ai/brand-assets">Brand library</a>
+</p>
 
 This repository is a shared shelf for the Skylit community. Members share AI agents, APIs, and MCP projects built on Skylit data. The account that hosts the repository holds the files. Each project belongs to the member who shared it.
 
