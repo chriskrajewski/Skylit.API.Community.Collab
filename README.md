@@ -21,7 +21,7 @@
   Skylit exposes options-flow and dealer-positioning data through two surfaces that share one API key:
 </p>
 
-<p align="center">
+<p align="left">
   <a href="https://docs.skylit.ai/api-reference/introduction">REST API</a><br>
   <a href="https://docs.skylit.ai/mcp/overview">MCP server</a> at <code>https://mcp.skylit.ai/mcp</code>
 </p>
