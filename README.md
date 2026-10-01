@@ -1,4 +1,23 @@
-# Skylit community collaboration hub
+<p align="center">
+  <a href="https://www.skylit.ai">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="brand/skylit-lockup-dark.png">
+      <source media="(prefers-color-scheme: light)" srcset="brand/skylit-lockup-light.png">
+      <img alt="Skylit" src="brand/skylit-lockup-light.png" width="420">
+    </picture>
+  </a>
+</p>
+
+<h1 align="center">Community collaboration hub</h1>
+
+<p align="center">
+  Shared agents, APIs, and MCP projects built on Skylit.<br>
+  <a href="https://www.skylit.ai">skylit.ai</a>
+  ·
+  <a href="https://docs.skylit.ai">Docs</a>
+  ·
+  <a href="https://www.skylit.ai/brand-assets">Brand library</a>
+</p>
 
 This repository is a shared shelf for the Skylit community. Members share AI agents, APIs, and MCP projects built on Skylit data. The account that hosts the repository holds the files. Each project belongs to the member who shared it.
 
@@ -50,12 +69,5 @@ Hub documentation and the blank template are dedicated under [CC0](LICENSE). A p
 - [SECURITY.md](SECURITY.md)
 - [LICENSE](LICENSE)
 
-## Repository settings
+The Skylit name and Satin Graphite lockup belong to Skylit, Inc. The files in [brand/](brand/) are the official horizontal lockup, used intact. This hub does not make a community project a Skylit product.
 
-These are changed in the GitHub settings for this repository:
-
-- Enable Discussions.
-- Set the topics `skylit`, `mcp`, and `ai-agents`.
-- Replace the description "Repo for the Skylit community to colab on" with "Community hub for Skylit agents, APIs, and MCP projects".
-- Enable private vulnerability reporting so [SECURITY.md](SECURITY.md) has a private path.
-- When the community is ready to share administration, transfer the repository to a GitHub Organization and add at least one other Organization Owner.

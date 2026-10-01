@@ -1,3 +1,13 @@
+<p align="center">
+  <a href="https://www.skylit.ai">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="../brand/skylit-lockup-dark.png">
+      <source media="(prefers-color-scheme: light)" srcset="../brand/skylit-lockup-light.png">
+      <img alt="Skylit" src="../brand/skylit-lockup-light.png" width="280">
+    </picture>
+  </a>
+</p>
+
 # Members
 
 No members have shared a project yet.
