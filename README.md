@@ -13,14 +13,22 @@
   <a href="https://www.skylit.ai/brand-assets">Brand library</a>
 </p>
 
-This repository is a shared shelf for the Skylit community. Members share AI agents, APIs, and MCP projects built on Skylit data. The account that hosts the repository holds the files. Each project belongs to the member who shared it.
+<p align="center">
+  This repository is a shared shelf for the Skylit community. Members share AI agents, APIs, and MCP projects built on Skylit data. The account that hosts the repository holds the files. Each project belongs to the member who shared it.
+</p>
 
-Skylit exposes options-flow and dealer-positioning data through two surfaces that share one API key:
+<p align="center">
+  Skylit exposes options-flow and dealer-positioning data through two surfaces that share one API key:
+</p>
 
-- [REST API](https://docs.skylit.ai/api-reference/introduction)
-- [MCP server](https://docs.skylit.ai/mcp/overview) at `https://mcp.skylit.ai/mcp`
+<p align="center">
+  <a href="https://docs.skylit.ai/api-reference/introduction">REST API</a><br>
+  <a href="https://docs.skylit.ai/mcp/overview">MCP server</a> at <code>https://mcp.skylit.ai/mcp</code>
+</p>
 
-Projects may use Heatseeker, Flowseeker, Tempest, or any combination of them.
+<p align="center">
+  Projects may use Heatseeker, Flowseeker, Tempest, or any combination of them.
+</p>
 
 ## Members
 
