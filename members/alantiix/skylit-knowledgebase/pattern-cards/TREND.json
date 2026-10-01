@@ -1,0 +1,24 @@
+{
+  "id": "TREND",
+  "name": "Strong Directional Trend",
+  "category": "Directional",
+  "setup": "King strike is far from spot price (>1% distance). The market has a strong directional bias. GEX structure shows a clear asymmetry \u2014 nodes stacked on one side with voids on the other.",
+  "entry": "Trade ONLY in the trend direction. Long if spot is above King and climbing toward distant targets. Short if spot is below King and falling into voids. Do not mean-revert on trending days.",
+  "exit": "Target the next major node in the trend direction. If void zones exist (no nodes), expect fast, violent moves through them. Exit at the first significant node where dealers may rebalance.",
+  "probability": "Increases when Trinity is aligned (all 3 indices trending same direction).",
+  "key_rules": [
+    "Macro-First Filtering: if broad market is trending, don't fight it on single tickers",
+    "Void Zones: no nodes = free-fall/melt-up, no support/resistance to catch price",
+    "Bear Liquidation Signal: if market pumps all day with zero pullbacks = local top forming",
+    "End-of-Day Unwind: 3:30-4:00 PM see Robinhood liquidations and dealer hedge flattening"
+  ],
+  "edge_cases": [
+    "Price Delivery Context: if price already tested a level and bounced, the move is 'done'",
+    "Don't trade same direction after level already paid out (Sloppy Seconds rule)"
+  ],
+  "sources": [
+    "PATTERN: Trend (Patternpedia)",
+    "Heatseeker 104 \u2014 Bear Liquidation Signal",
+    "Heatseeker 106 \u2014 Price Delivery Context"
+  ]
+}

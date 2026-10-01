@@ -1,0 +1,24 @@
+{
+  "id": "GATEKEEPER",
+  "name": "Gatekeeper Rejection",
+  "category": "Rejection/Fade",
+  "setup": "Price approaches a significant positive GEX (yellow) node \u2014 the King Node or a major Gatekeeper node between spot and the target. These nodes act as suppressors that dampen volatility and reject price advances.",
+  "entry": "Fade the approach: limit sell (puts/shorts) as price touches the Gatekeeper or King Node. Enter on green candles into the ceiling. The node absorbs momentum and causes rejection.",
+  "exit": "Target the next lower node (floor or next Gatekeeper). Take partials at the first Gatekeeper below. Use the '1st/2nd test' rule \u2014 high probability of bounce on tests 1-2.",
+  "probability": "1st test: ~66% chance of rejection. 2nd test: ~66%. 3rd test: probability SHIFTS to ~66% chance of breaking through.",
+  "key_rules": [
+    "Gatekeeper = node between spot and King (intermediate resistance/support)",
+    "King Node = strongest node, the 'final boss' level",
+    "3rd Test Rule: avoid fading the 3rd test \u2014 probability favors breakout",
+    "Node Wash-Off: after a node is tapped and value drops, the level is 'dead'"
+  ],
+  "edge_cases": [
+    "King Node open: if market opens above King, high probability of fade-back through it",
+    "'Sloppy Seconds': don't re-trade a level after it already paid out and node value dropped"
+  ],
+  "sources": [
+    "Heatseeker 104 \u2014 Gatekeeper Bounce Rule",
+    "PATTERN: The Gatekeeper (Patternpedia)",
+    "SPX 3000% Crash \u2014 King Node Overshoot"
+  ]
+}
