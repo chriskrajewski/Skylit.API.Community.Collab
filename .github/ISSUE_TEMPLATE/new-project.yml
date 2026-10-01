@@ -1,0 +1,45 @@
+name: New project
+description: Share an agent, API, or MCP project under your Discord username.
+title: "project: "
+labels:
+  - new-project
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Copy `templates/project/` to `members/<discord-username>/<project-id>/` and open a pull request. This issue can track that share before the pull request exists.
+  - type: input
+    id: discord
+    attributes:
+      label: Discord username
+      description: Your current Discord username. This becomes the member folder name. Lowercase, 2–32 characters, using only a-z, 0-9, underscore, and period.
+      placeholder: alice
+    validations:
+      required: true
+  - type: input
+    id: project-id
+    attributes:
+      label: Project identifier
+      description: Folder name for this project, unique among your projects. Lowercase kebab-case, 2–48 characters, starting with a letter.
+      placeholder: flow-sweep-agent
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      description: What you are sharing.
+      options:
+        - agent
+        - api
+        - mcp
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: What it does
+      description: One short paragraph. Include whether it uses the REST API, the MCP server, or both, and which Skylit products it calls.
+      placeholder: Flags unusual call sweeps on a watchlist through the Skylit MCP server (Flowseeker).
+    validations:
+      required: true
