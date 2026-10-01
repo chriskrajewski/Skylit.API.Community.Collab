@@ -2,7 +2,7 @@
   <img alt="Skylit" src="brand/skylit-lockup-light.png" width="420">
 </p>
 
-<h1 align="center">Community developer collaboration hub</h1>
+<h1 align="center">Community collaboration hub</h1>
 
 <p align="center">
   Shared agents, APIs, and MCP projects built on Skylit.<br>
