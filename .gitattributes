@@ -1,1 +1,2 @@
 members/alantiix/skylit-academy-playbook-skill/skill-fine-tune/** filter=git-crypt diff=git-crypt
+members/alantiix/skylit-academy-playbook-skill/skill-fine-tune/README.md !filter !diff
