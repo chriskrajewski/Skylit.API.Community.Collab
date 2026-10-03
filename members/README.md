@@ -31,10 +31,9 @@ Each member has one folder, `members/<discord-username>/`, and a page at `member
 
 ```text
 members/
-  alantiix/
+  {discord-username}/
     README.md
-    skylit-academy-playbook-skill/
-    skylit-knowledgebase/
+    {project-name}/
 ```
 
 ## Adding yourself
