@@ -8,10 +8,35 @@
   </a>
 </p>
 
-# Members
+<h1 align="center">Members</h1>
 
-Each member has one folder, `members/<discord-username>/`, and a page at `members/<discord-username>/README.md` that lists only their projects. When your first project is ready, add a link here, in alphabetical order by Discord username:
+<p align="center">
+  Every project in this hub belongs to the member who shared it.<br>
+  <a href="../README.md">Hub overview</a>
+  ·
+  <a href="../CONTRIBUTING.md">Contributing</a>
+</p>
 
-```markdown
-[alantiix](alantiix/README.md)
+---
+
+## Index
+
+| Member | Projects |
+| --- | --- |
+| [alantiix](alantiix/README.md) | [skylit-academy-playbook-skill](alantiix/skylit-academy-playbook-skill/README.md) · [skylit-knowledgebase](alantiix/skylit-knowledgebase/README.md) |
+
+## How this is organized
+
+Each member has one folder, `members/<discord-username>/`, and a page at `members/<discord-username>/README.md` that lists only their projects.
+
+```text
+members/
+  alantiix/
+    README.md
+    skylit-academy-playbook-skill/
+    skylit-knowledgebase/
 ```
+
+## Adding yourself
+
+When your first project is ready, add a row to the index above in alphabetical order by Discord username. The full steps are in [CONTRIBUTING.md](../CONTRIBUTING.md).
