@@ -2,8 +2,6 @@
   <img alt="Alantiix x Skylit" src="../../brand/alantiix-x-skylit.png" width="480">
 </p>
 
-<h1 align="center">alantiix</h1>
-
 <p align="center">
   Agent skills and knowledge bases for the Skylit Heatseeker methodology.<br>
   <a href="https://www.skylit.ai">skylit.ai</a>
