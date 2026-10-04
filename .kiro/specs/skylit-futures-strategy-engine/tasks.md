@@ -588,13 +588,13 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
     - R_Multiple of −1 at the stop with zero costs, the contract values, and MLL and DLL on the same bar
     - _Requirements: 13.9, 13.11, 15.7, 15.12, 15.13_
 
-- [ ] 19. Backtester and decision log
+- [x] 19. Backtester and decision log
   - [x] 19.1 Implement the decision log and Run_Manifest
     - `src/fse/backtest/decision_log.py`: one canonical JSONL entry per Decision_Time with every Requirement 18.7 field
     - `src/fse/backtest/manifest.py`: the Run_Manifest fields, with `code_version` from `git describe --always --dirty`, written in `finally` with status `completed` or `aborted`
     - _Requirements: 18.4, 18.6, 18.7_
 
-  - [ ] 19.2 Implement `run_backtest`
+  - [x] 19.2 Implement `run_backtest`
     - `src/fse/backtest/runner.py`:
       - validate the range and calendars
       - in offline mode, build no `SkylitClient` and print sessions with absent or incomplete windows
@@ -608,23 +608,23 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
       - write the trade list as CSV and JSON
     - _Requirements: 1.8, 3.12, 3.13, 5.5, 5.6, 15.9, 15.17, 15.18, 18.1, 18.2, 18.3, 18.4, 18.5, 18.6_
 
-  - [ ] 19.3 Write property test for no look-ahead
+  - [x] 19.3 Write property test for no look-ahead
     - **Property 14: No look-ahead**
     - **Validates: Requirements 5.3, 5.4, 5.11, 9.1**
 
-  - [ ] 19.4 Write property test for backtest determinism
+  - [x] 19.4 Write property test for backtest determinism
     - **Property 34: Backtest determinism**
     - **Validates: Requirements 10.15, 18.5**
 
-  - [ ] 19.5 Write property test for decision-log completeness
+  - [x] 19.5 Write property test for decision-log completeness
     - **Property 53: Decision-log completeness**
     - **Validates: Requirements 18.3, 18.6, 18.7**
 
-  - [ ] 19.6 Write property test for restart parity
+  - [x] 19.6 Write property test for restart parity
     - **Property 49: Restart parity**
     - **Validates: Requirements 16.7**
 
-  - [ ] 19.7 Write integration test for the offline backtest
+  - [x] 19.7 Write integration test for the offline backtest
     - Call `run_backtest` in offline mode on a synthetic cache with `SKYLIT_API_KEY` unset. Assert zero network calls, no key error, and the gap printout
     - _Requirements: 1.8, 3.12, 3.13_
 

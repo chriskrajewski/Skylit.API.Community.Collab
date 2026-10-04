@@ -211,6 +211,22 @@
     "20.6 Write property test for validation errors": {
       "status": "passed",
       "lastRunTimestamp": 1791083666855
+    },
+    "19.3 Write property test for no look-ahead": {
+      "status": "passed",
+      "lastRunTimestamp": 1791087258303
+    },
+    "19.4 Write property test for backtest determinism": {
+      "status": "passed",
+      "lastRunTimestamp": 1791087258303
+    },
+    "19.5 Write property test for decision-log completeness": {
+      "status": "passed",
+      "lastRunTimestamp": 1791087258303
+    },
+    "19.6 Write property test for restart parity": {
+      "status": "passed",
+      "lastRunTimestamp": 1791087258303
     }
   },
   "executionHistory": {
