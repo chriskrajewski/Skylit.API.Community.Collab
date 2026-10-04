@@ -909,7 +909,7 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
     - The templates pass the lint and hold the Narrator restatement rule and the engine-decides rule
     - _Requirements: 26.13, 26.14, 26.16_
 
-- [ ] 31. Checkpoint - Operator runs the holdout evaluation and builds the Revised_Drafts
+- [x] 31. Checkpoint - Operator runs the holdout evaluation and builds the Revised_Drafts
   - Ensure all tests pass, ask the user if questions arise.
   - Operator: choose a config, run `fse experiment holdout --config <chosen>`, then run `fse drafts build --chosen <chosen>`. Review the drafts and run `fse skilldocs check` and `fse scan-secrets`. Record an approval only after the review.
 
