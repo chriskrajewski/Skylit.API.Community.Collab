@@ -36,7 +36,7 @@ import re
 from collections.abc import Hashable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, ClassVar, Final, Literal
+from typing import Any, ClassVar, Final, Literal, get_args
 
 import yaml
 from pydantic import ValidationError
@@ -44,7 +44,8 @@ from pydantic_core import ErrorDetails
 
 from fse.config.schema import StrategyConfig
 from fse.config.schema._base import DUPLICATE_ID
-from fse.config.schema.fills import FEE_MAX_USD, FEE_MIN_USD, FILL_INSTRUMENTS
+from fse.config.schema.data import EsInstrument, NqInstrument
+from fse.config.schema.fills import FEE_MAX_USD, FEE_MIN_USD
 from fse.config.warnings import ConfigWarning, contradiction_warnings
 
 __all__ = [
@@ -506,8 +507,8 @@ def _missing_costs(data: object, file: str, lines: Mapping[str, int]) -> list[Co
     """``fills.costs.<instrument>`` missing for an instrument ``data.instruments`` trades.
 
     Reads the parsed mapping with the schema defaults (MES, MNQ) for omitted
-    keys, so it runs even when other keys fail. A section of the wrong type is
-    left to the schema errors.
+    keys, so it runs even when other keys fail. A section of the wrong type, or
+    an instrument the key does not allow, is left to the schema errors.
     """
     if not isinstance(data, dict):
         return []
@@ -518,9 +519,12 @@ def _missing_costs(data: object, file: str, lines: Mapping[str, int]) -> list[Co
     if not isinstance(instruments, dict) or not isinstance(costs, dict):
         return []
     errors: list[ConfigError] = []
-    for key, default in (("es_levels", "MES"), ("nq_levels", "MNQ")):
+    for key, default, allowed in (
+        ("es_levels", "MES", get_args(EsInstrument.__value__)),
+        ("nq_levels", "MNQ", get_args(NqInstrument.__value__)),
+    ):
         instrument = instruments.get(key, default)
-        if not isinstance(instrument, str) or instrument not in FILL_INSTRUMENTS:
+        if not isinstance(instrument, str) or instrument not in allowed:
             continue
         if costs.get(instrument) is not None:
             continue

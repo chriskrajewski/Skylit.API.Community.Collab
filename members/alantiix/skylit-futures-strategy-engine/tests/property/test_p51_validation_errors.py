@@ -657,7 +657,7 @@ def test_base_configs_load() -> None:
 
 # A counterexample this property found, pinned so it runs every time: an invalid
 # ``data.instruments.es_levels`` that names another fill instrument (NQ) also
-# gets a "missing required key" error for ``fills.costs.NQ``, though no valid
+# got a "missing required key" error for ``fills.costs.NQ``, though no valid
 # setting trades NQ: 2 errors for 1 violation.
 ES_LEVELS_NQ: Final = Violation(
     "out of range",

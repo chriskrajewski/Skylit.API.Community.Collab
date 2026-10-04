@@ -536,7 +536,7 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
     - Next_Node with no Node beyond entry, Trailing with no target, and breakeven past the close
     - _Requirements: 11.7, 12.12, 12.22_
 
-- [ ] 17. Checkpoint - Engine units pass
+- [x] 17. Checkpoint - Engine units pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [x] 18. Fill_Simulator and Account_Simulator
@@ -671,7 +671,7 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
     - **Property 50: Config round-trip**
     - **Validates: Requirements 17.7, 17.8**
 
-  - [ ] 20.6 Write property test for validation errors
+  - [x] 20.6 Write property test for validation errors
     - **Property 51: Validation reports every violation**
     - **Validates: Requirements 13.8, 15.4, 17.4**
 

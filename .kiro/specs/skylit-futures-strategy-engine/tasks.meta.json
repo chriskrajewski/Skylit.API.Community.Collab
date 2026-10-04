@@ -209,9 +209,8 @@
       "lastRunTimestamp": 1791078218405
     },
     "20.6 Write property test for validation errors": {
-      "status": "failed",
-      "failingExample": "Minimal config + data.instruments.es_levels: NQ (one violation). Expected errors: [('data.instruments.es_levels', 'out of range')]. Got: [('data.instruments.es_levels', 'out of range'), ('fills.costs.NQ', 'missing required key')]. Same with nq_levels: ES -> spurious fills.costs.ES. Cause: fse.config.loader._missing_costs treats any FILL_INSTRUMENTS value as traded, even when it is invalid for that key (es_levels allows only ES/MES, nq_levels only NQ/MNQ). Pinned with @example. Every other violation group passed: 100 examples in pytest plus a 1500-example run that left out invalid data.instruments values.",
-      "lastRunTimestamp": 1791082772658
+      "status": "passed",
+      "lastRunTimestamp": 1791083666855
     }
   },
   "executionHistory": {
