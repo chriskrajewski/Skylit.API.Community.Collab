@@ -271,6 +271,22 @@
     "26.6 Write property test for seeded analytics determinism": {
       "status": "passed",
       "lastRunTimestamp": 1791141492992
+    },
+    "27.4 Write property test for holdout isolation": {
+      "status": "passed",
+      "lastRunTimestamp": 1791144406528
+    },
+    "27.5 Write property test for the append-only Holdout_Log": {
+      "status": "passed",
+      "lastRunTimestamp": 1791144406528
+    },
+    "27.6 Write property test for walk-forward windows and selection": {
+      "status": "passed",
+      "lastRunTimestamp": 1791144406528
+    },
+    "27.7 Write property test for the cadence comparison": {
+      "status": "passed",
+      "lastRunTimestamp": 1791144406528
     }
   },
   "executionHistory": {

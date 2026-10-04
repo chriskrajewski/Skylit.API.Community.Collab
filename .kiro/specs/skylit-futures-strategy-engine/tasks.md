@@ -822,8 +822,8 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
     - **Property 64: Seeded analytics determinism**
     - **Validates: Requirements 20.12, 21.9**
 
-- [ ] 27. Holdout evaluation, walk-forward and cadence comparison
-  - [ ] 27.1 Implement the holdout evaluation and Holdout_Log
+- [x] 27. Holdout evaluation, walk-forward and cadence comparison
+  - [x] 27.1 Implement the holdout evaluation and Holdout_Log
     - Extend `src/fse/experiments/holdout.py`:
       - validate the config and read the Holdout_Log
       - warn with the overlap count and record the warning in the Run_Manifest
@@ -832,7 +832,7 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
     - A failed request leaves the log byte-identical
     - _Requirements: 22.3, 22.4, 22.5, 22.6, 22.7, 22.8_
 
-  - [ ] 27.2 Implement walk-forward tests
+  - [x] 27.2 Implement walk-forward tests
     - `src/fse/experiments/walkforward.py`:
       - window pairs
       - selection by the walk-forward objective among configurations not labeled "insufficient sample"
@@ -840,26 +840,26 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
       - concatenated out-of-sample results beside pooled in-sample results
     - _Requirements: 22.9, 22.10, 22.11, 22.12, 22.13, 22.14, 22.15, 22.16_
 
-  - [ ] 27.3 Implement the cadence comparison
+  - [x] 27.3 Implement the cadence comparison
     - `src/fse/experiments/cadence.py`:
       - select the eligible sessions by stored Snapshot and bar interval
       - report an error when no session qualifies
       - compute per-cadence metrics and pairwise differences (shorter minus longer)
     - _Requirements: 18.8, 18.9, 18.10_
 
-  - [ ] 27.4 Write property test for holdout isolation
+  - [x] 27.4 Write property test for holdout isolation
     - **Property 67: Holdout isolation**
     - **Validates: Requirements 22.1, 22.2, 22.4**
 
-  - [ ] 27.5 Write property test for the append-only Holdout_Log
+  - [x] 27.5 Write property test for the append-only Holdout_Log
     - **Property 68: Holdout_Log is append-only**
     - **Validates: Requirements 22.5, 22.6, 22.7**
 
-  - [ ] 27.6 Write property test for walk-forward windows and selection
+  - [x] 27.6 Write property test for walk-forward windows and selection
     - **Property 69: Walk-forward windows and selection**
     - **Validates: Requirements 22.9, 22.10, 22.11, 22.16**
 
-  - [ ] 27.7 Write property test for the cadence comparison
+  - [x] 27.7 Write property test for the cadence comparison
     - **Property 54: Cadence comparison**
     - **Validates: Requirements 18.8, 18.10**
 

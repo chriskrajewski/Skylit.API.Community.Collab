@@ -30,7 +30,13 @@ window) goes through :func:`run_experiment`:
    them by ``ranking_objective`` (default: the base config's
    ``experiments.ranking_objective``) with the tie rules of
    :mod:`fse.experiments.ranking`.
-7. **Bootstrap** (Req 20.12). With ``bootstrap_resamples`` set, every
+7. **Session filter** (Req 18.8). A ``session_filter`` keeps a subset of the
+   sessions outside the Holdout_Period (the cadence comparison keeps the
+   sessions whose stored intervals support every cadence); it may raise
+   :class:`ExperimentInputError` before anything is written. Every
+   configuration then runs on those sessions only (``EvalTask.only_sessions``),
+   and the dropped ones are ``ExperimentResult.excluded``.
+8. **Bootstrap** (Req 20.12). With ``bootstrap_resamples`` set, every
    completed configuration also gets 95% percentile bootstrap intervals,
    drawn with the experiment seed; the Run_Manifest records the seed and
    resample count.
@@ -71,7 +77,7 @@ from fse.backtest.manifest import (
     SkippedSession,
     run_manifest,
 )
-from fse.backtest.runner import cache_holdout, metrics_cfg, run_backtest
+from fse.backtest.runner import SessionOutcome, cache_holdout, metrics_cfg, run_backtest
 from fse.calendars import load_calendars
 from fse.config.hashing import config_hash
 from fse.config.schema import StrategyConfig
@@ -84,7 +90,7 @@ from fse.experiments.ranking import objective_values, rank
 from fse.logio import LogWriter
 from fse.logio.canonical_json import JsonValue
 from fse.logio.redact import Redactor
-from fse.timekit import Instant, SessionTimes
+from fse.timekit import Instant, SessionCalendar, SessionTimes
 
 __all__ = [
     "COMPARISON_FILE_NAME",
@@ -100,7 +106,9 @@ __all__ = [
     "ExperimentInputError",
     "ExperimentResult",
     "OutputBuilder",
+    "SessionFilter",
     "backtest_evaluator",
+    "check_configs",
     "comparison_to_jsonable",
     "experiment_sessions",
     "metrics_cfg",
@@ -141,8 +149,9 @@ class ExperimentConfig:
 class EvalTask:
     """What one configuration's evaluation gets; picklable for a worker process.
 
-    Every task of one experiment has the same ``data_range``, ``seed`` and
-    ``bootstrap_resamples`` (``None``: no bootstrap intervals).
+    Every task of one experiment has the same ``data_range``, ``seed``,
+    ``bootstrap_resamples`` (``None``: no bootstrap intervals) and
+    ``only_sessions`` (``None``: every session of the range).
     """
 
     index: int
@@ -155,6 +164,7 @@ class EvalTask:
     calendar_dir: Path
     code_version: str | None
     bootstrap_resamples: int | None = None
+    only_sessions: tuple[date, ...] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -162,6 +172,9 @@ class ConfigResult:
     """A completed configuration: its sessions, metrics, pass estimate and intervals.
 
     ``intervals`` is ``None`` when the task asked for no bootstrap intervals.
+    ``outcomes`` (the per-session Monte Carlo inputs) and ``setup_keys`` (the
+    count of distinct Setup_Keys among Candidate_Setups) are ``None`` when the
+    evaluator does not give them.
     """
 
     run_id: str
@@ -170,6 +183,8 @@ class ConfigResult:
     metrics: Metrics
     pass_estimate: PassEstimate
     intervals: BootstrapIntervals | None = None
+    outcomes: tuple[SessionOutcome, ...] | None = None
+    setup_keys: int | None = None
 
 
 type Evaluator = Callable[[EvalTask, LogWriter], ConfigResult]
@@ -198,7 +213,9 @@ class ExperimentResult:
     """What :func:`run_experiment` compared, in definition order.
 
     ``sessions`` are the requested calendar sessions outside the
-    Holdout_Period; ``data_range`` spans them and is every configuration's range.
+    Holdout_Period (and kept by the session filter, if any); ``data_range``
+    spans them and is every configuration's range. ``excluded`` are the
+    sessions outside the Holdout_Period that the session filter dropped.
     """
 
     kind: str
@@ -212,6 +229,7 @@ class ExperimentResult:
     min_trades: int
     ranking_objective: RankingObjective
     outcomes: tuple[ConfigOutcome, ...]
+    excluded: tuple[date, ...] = ()
 
     @property
     def compared_sessions(self) -> tuple[date, ...]:
@@ -238,6 +256,9 @@ class ExperimentResult:
 
 type OutputBuilder = Callable[[ExperimentResult], Mapping[str, JsonValue]]
 """Extra JSON files (name to content) written into the experiment directory."""
+
+type SessionFilter = Callable[[DataCache, SessionCalendar, tuple[date, ...]], tuple[date, ...]]
+"""Keeps a subset of the experiment's sessions; may raise :class:`ExperimentInputError`."""
 
 
 # ---------------------------------------------------------------- sessions
@@ -267,6 +288,7 @@ def backtest_evaluator(task: EvalTask, writer: LogWriter) -> ConfigResult:
             writer=writer,
             calendar_dir=task.calendar_dir,
             code_version=task.code_version,
+            only_sessions=task.only_sessions,
         )
     sessions = bt.manifest.sessions_evaluated
     mcfg = metrics_cfg(task.cfg)
@@ -293,6 +315,8 @@ def backtest_evaluator(task: EvalTask, writer: LogWriter) -> ConfigResult:
         metrics=metrics,
         pass_estimate=mc.estimate,
         intervals=intervals,
+        outcomes=bt.outcomes,
+        setup_keys=len({r.key for r in bt.setups}),
     )
 
 
@@ -369,7 +393,8 @@ def _outcomes(
     return tuple(out)
 
 
-def _check_configs(configs: Sequence[ExperimentConfig]) -> None:
+def check_configs(configs: Sequence[ExperimentConfig]) -> None:
+    """Raise :class:`ExperimentInputError` for no configuration, a bad or repeated name."""
     if not configs:
         raise ExperimentInputError("an experiment needs at least one configuration")
     seen: set[str] = set()
@@ -425,6 +450,7 @@ def run_experiment(
     code_version: str | None = None,
     ranking_objective: RankingObjective | None = None,
     bootstrap_resamples: int | None = None,
+    session_filter: SessionFilter | None = None,
 ) -> ExperimentResult:
     """Run every configuration of ``configs`` on the same sessions and seed (module notes).
 
@@ -433,7 +459,7 @@ def run_experiment(
     :class:`ExperimentInputError` (or ``CalendarError``, ``PathGuardError``)
     before anything is written.
     """
-    _check_configs(configs)
+    check_configs(configs)
     if isinstance(workers, bool) or not isinstance(workers, int) or workers < 1:
         raise ExperimentInputError(f"workers must be a whole number of at least 1: {workers!r}")
     objective = (
@@ -454,14 +480,24 @@ def run_experiment(
     used_seed = resolve_seed(seed)
     times = base.account.session_times(SessionTimes() if base_times is None else base_times)
     calendars = load_calendars(calendar_dir, requested.start, requested.end, times=times)
+    calendar = calendars.exchange.sessions
     with DataCache(cache_dir) as cache:
-        holdout = cache_holdout(base, cache, calendars.exchange.sessions)
-    sessions = experiment_sessions(calendars.run_sessions, holdout)
-    if not sessions:
-        where = "" if holdout is None else f" outside the Holdout_Period ({holdout.first} on)"
-        raise ExperimentInputError(
-            f"the range {requested.start} to {requested.end} holds no session{where}"
-        )
+        holdout = cache_holdout(base, cache, calendar)
+        sessions = experiment_sessions(calendars.run_sessions, holdout)
+        if not sessions:
+            where = "" if holdout is None else f" outside the Holdout_Period ({holdout.first} on)"
+            raise ExperimentInputError(
+                f"the range {requested.start} to {requested.end} holds no session{where}"
+            )
+        excluded: tuple[date, ...] = ()
+        if session_filter is not None:
+            kept = frozenset(session_filter(cache, calendar, sessions))
+            excluded = tuple(d for d in sessions if d not in kept)
+            sessions = tuple(d for d in sessions if d in kept)
+            if not sessions:
+                raise ExperimentInputError(
+                    f"the session filter kept no session of {requested.start} to {requested.end}"
+                )
     data_range = DataRange(sessions[0], sessions[-1])
     hashes = [config_hash(c.cfg) for c in configs]
     base_hash = config_hash(base)
@@ -491,6 +527,7 @@ def run_experiment(
                 calendar_dir=Path(calendar_dir),
                 code_version=code_version,
                 bootstrap_resamples=bootstrap_resamples,
+                only_sessions=None if session_filter is None else sessions,
             )
             for i, c in enumerate(configs)
         ]
@@ -519,6 +556,7 @@ def run_experiment(
             min_trades=min_trades,
             ranking_objective=objective,
             outcomes=outcomes,
+            excluded=excluded,
         )
         for o in outcomes:
             if not o.completed:

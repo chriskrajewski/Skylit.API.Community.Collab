@@ -119,7 +119,7 @@ import io
 import secrets
 import time
 from collections import deque
-from collections.abc import Callable, Generator, Iterable, Mapping, Sequence
+from collections.abc import Callable, Collection, Generator, Iterable, Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -205,6 +205,7 @@ __all__ = [
     "WindowGap",
     "backtest_range",
     "cache_holdout",
+    "cache_sessions_with_data",
     "check_sessions",
     "default_run_id",
     "has_first_target",
@@ -982,10 +983,15 @@ def run_backtest(
     clock: Callable[[], Instant] = time.time_ns,
     code_version: str | None = None,
     shadow_mode: ShadowMode = "rejected",
+    only_sessions: Collection[date] | None = None,
 ) -> BacktestResult:
     """Run ``cfg`` over every session of ``sessions`` from ``cache`` (see the module notes).
 
     - ``sessions``: the inclusive date range (:func:`backtest_range` checks it).
+    - ``only_sessions``: when set, only the range's sessions in it run; the
+      others are left out of the run (not evaluated, not skipped). The
+      Experiment_Runner uses it for the holdout evaluation and the cadence
+      comparison (Req 18.8, 22.4).
     - ``out_dir``: the run directory; it must not hold a backtest output yet.
     - ``seed``: recorded in the Run_Manifest; ``None`` draws one.
     - ``calendar_dir``: the three calendar files, default the Project's
@@ -1018,6 +1024,13 @@ def run_backtest(
         raise BacktestInputError(
             f"invalid date range: {sessions.start} to {sessions.end} contains no session"
         )
+    if only_sessions is not None:
+        allowed = frozenset(only_sessions)
+        run_sessions = tuple(d for d in run_sessions if d in allowed)
+        if not run_sessions:
+            raise BacktestInputError(
+                f"none of the selected sessions is in {sessions.start} to {sessions.end}"
+            )
     calendar = calendars.exchange.sessions
     params = EngineParams.from_sections(cfg)
     instruments = params.instruments
@@ -1186,6 +1199,32 @@ def _holdout(
         instruments=instruments,
     )
     with_data = [c.session for c in checks if not c.skip]
+    return _holdout_of(cfg, with_data)
+
+
+def cache_sessions_with_data(
+    cfg: StrategyConfig,
+    cache: DataCache,
+    calendar: SessionCalendar,
+    sessions: Iterable[date] | None = None,
+) -> tuple[date, ...]:
+    """The sessions (default: every calendar session) the cache holds full data for.
+
+    Full data is what :func:`cache_holdout` counts: a Snapshot for each of
+    ``cfg``'s symbols and metrics and bars for each of its instruments.
+    """
+    checks = check_sessions(
+        cache,
+        calendar,
+        calendar.sessions() if sessions is None else sessions,
+        symbols=tuple(cfg.data.symbols),
+        view_id=heatmap_view(cfg.data.heatmap_view).view_id(),
+        instruments=EngineParams.from_sections(cfg).instruments,
+    )
+    return tuple(c.session for c in checks if not c.skip)
+
+
+def _holdout_of(cfg: StrategyConfig, with_data: Sequence[date]) -> HoldoutPeriod | None:
     if not with_data:
         return None
     try:
