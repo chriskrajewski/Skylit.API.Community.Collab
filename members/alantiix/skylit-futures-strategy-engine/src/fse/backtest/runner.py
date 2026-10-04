@@ -62,7 +62,10 @@ Account_Simulator closes every position at the open of the bar that opens at
 the deadline, cancels every working order and applies the day-end rules. A
 Combine_Attempt that passes or fails ends, and the next trading day starts a
 new one (Req 15.9, 15.17); the one still running when the range ends is
-recorded as incomplete (Req 15.18).
+recorded as incomplete (Req 15.18). The closing fills reach the
+Risk_Manager, the Order_Planner and the next step only once that bar has
+closed (Req 5.3): on an early-close day at the first Decision_Time at or after
+the deadline plus 60 s, otherwise at the next session's first Decision_Time.
 
 **Monte Carlo inputs.** Each evaluated session gets a :class:`SessionOutcome`:
 the trading day's net P&L, its intraday equity low (the lowest day P&L plus
@@ -145,7 +148,7 @@ from fse.sim.account import (
 )
 from fse.sim.fills import FillEvent, SimBook, close_all
 from fse.sim.fills import on_bar as fill_bar
-from fse.timekit import Instant, SessionCalendar, SessionTimes
+from fse.timekit import NS_PER_SECOND, Instant, SessionCalendar, SessionTimes
 
 __all__ = [
     "ATTEMPTS_FILE_NAME",
@@ -631,23 +634,32 @@ class _Loop:
         self._truncated = False
         deadline = cal.flat_deadline(session)
         rth = (cal.rth_open(session), cal.rth_close(session))
+        # The closing fills are stamped on the bar that opens at the deadline, so
+        # the engine first sees them when that bar has closed (Req 5.3).
+        observed = deadline + BASE_INTERVAL_S * NS_PER_SECOND
         groups = _groups(data.bars, cal.trading_day_start(session), deadline)
         i = 0
         ended = False
+        held: list[tuple[Bar, FillEvent]] | None = None
         for t in cal.decision_times(session, self._cadence_s):
             view = data.inputs.view(t)
             while i < len(groups) and groups[i].close_ns <= t:
                 self._bar_phase(groups[i], view, rth)
                 i += 1
             if not ended and t >= deadline:
-                self._end_day(data, deadline)
+                held = self._end_day(data, deadline)
                 ended = True
+            if held is not None and t >= observed:
+                self._deliver(held)
+                held = None
             self._decide(view, t)
         if not ended:
             view = data.inputs.view(deadline)
             for group in groups[i:]:
                 self._bar_phase(group, view, rth)
-            self._end_day(data, deadline)
+            held = self._end_day(data, deadline)
+        if held is not None:
+            self._deliver(held)
         net = self._account.day_pnl
         self.outcomes.append(SessionOutcome(session, net, min(self._day_low, net), self._truncated))
 
@@ -781,8 +793,11 @@ class _Loop:
             priced[(trade.instrument, trade.direction)] = (bar, trade.worst_price(bar))
         return self._close(priced, event.rule, event.bar_open_ns)
 
-    def _end_day(self, data: _Session, deadline: Instant) -> None:
-        """The Flat_Deadline: the account's flat close and day-end rules (Req 15.7, 15.16)."""
+    def _end_day(self, data: _Session, deadline: Instant) -> list[tuple[Bar, FillEvent]]:
+        """The Flat_Deadline: the account's flat close and day-end rules (Req 15.7, 15.16).
+
+        Returns the closing fills; :meth:`_deliver` hands them to the engine.
+        """
         closing: dict[str, Bar] = {}
         for bar in data.bars:
             if bar.open_ns >= deadline and bar.instrument not in closing:
@@ -807,6 +822,10 @@ class _Loop:
             raise ValueError(f"{data.session}: open trades remain after the Flat_Deadline")
         if self.book.orders:
             self._close({}, "flat_deadline", deadline)
+        return flat
+
+    def _deliver(self, flat: Sequence[tuple[Bar, FillEvent]]) -> None:
+        """The Flat_Deadline fills to the Risk_Manager and the Order_Planner (bar phase 3-4)."""
         self._count(e for _, e in flat)
         for bar in dict.fromkeys(b for b, _ in flat):
             self._update_stops(bar, flat)

@@ -27,9 +27,14 @@ Strategy_Config. The expected values come from the generated inputs:
   in order) and a Grade that follows from them; each order is a planner
   intent type.
 - **Fills since the previous Decision_Time**: every logged fill is on a bar
-  that opened after ``t_prev - 60 s`` and at or before ``t``. Each fill of the
-  trade list whose bar closed at or before the run's last Decision_Time is
-  logged exactly once, and no other fill is.
+  that opened after ``t_prev - 60 s`` and closed at or before ``t`` (Req 5.3).
+  Each fill of the trade list whose bar closed at or before the run's last
+  Decision_Time is logged exactly once, and no other fill is.
+
+Pinned example: the early-close session of
+:func:`~tests.strategies.backtest_inputs.early_close_hold` at the default 60 s
+cadence (390 entries). Its trade is closed at the 13:00 Flat_Deadline, so the
+closing fill must be logged at 13:01.
 
 **Validates: Requirements 18.3, 18.6, 18.7**
 """
@@ -42,7 +47,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Final
 
-from hypothesis import event, given
+from hypothesis import event, example, given
 
 from fse.backtest.decision_log import DECISION_LOG_FILE_NAME
 from fse.backtest.manifest import MANIFEST_FILE_NAME
@@ -58,6 +63,8 @@ from tests.strategies.backtest_inputs import (
     MINUTE,
     MarketInputs,
     SessionInputs,
+    early_close_hold,
+    fixed_config,
     market_inputs,
     run,
     strategy_configs,
@@ -171,7 +178,7 @@ def check_run(market: MarketInputs, cfg: StrategyConfig, result: BacktestResult)
             event(f"order: {order['type']}")
         for f in entry["fills"]:
             opened = f["fill"]["bar_open_ns"]
-            assert opened <= t
+            assert opened + MINUTE <= t, (opened, t)
             assert t_prev is None or opened > t_prev - MINUTE, (opened, t_prev, t)
             logged[dumps(f["fill"])] += 1
         if entry["lockouts"]:
@@ -191,6 +198,7 @@ def check_run(market: MarketInputs, cfg: StrategyConfig, result: BacktestResult)
 
 # Feature: skylit-futures-strategy-engine, Property 53: Decision-log completeness
 @given(market=market_inputs(gaps=True), cfg=strategy_configs())
+@example(market=early_close_hold(), cfg=fixed_config(60))
 def test_one_valid_entry_per_evaluated_decision_time(
     market: MarketInputs, cfg: StrategyConfig
 ) -> None:

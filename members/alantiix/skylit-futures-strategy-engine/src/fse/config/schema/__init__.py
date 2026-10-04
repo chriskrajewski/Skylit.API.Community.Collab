@@ -30,7 +30,8 @@ from __future__ import annotations
 
 from typing import Annotated, Final, Literal
 
-from pydantic import StringConstraints, model_validator
+from pydantic import StringConstraints, field_validator, model_validator
+from pydantic_core import PydanticCustomError
 
 from fse.config.schema._base import SchemaModel
 from fse.config.schema.account import AccountConfig
@@ -119,6 +120,17 @@ class StrategyConfig(SchemaModel):
     notify: NotifyConfig = NotifyConfig()
     reporting: ReportingConfig = ReportingConfig()
     experiments: ExperimentsConfig = ExperimentsConfig()
+
+    @field_validator("schema_version", mode="before")
+    @classmethod
+    def _known_schema_version(cls, value: object) -> object:
+        # pydantic's Literal check reads a whole number into 64 bits first, so a
+        # larger one failed as a parse error instead of "Input should be 1".
+        if isinstance(value, int) and not isinstance(value, bool) and value != SCHEMA_VERSION:
+            raise PydanticCustomError(
+                "literal_error", "Input should be {expected}", {"expected": str(SCHEMA_VERSION)}
+            )
+        return value
 
     @model_validator(mode="before")
     @classmethod

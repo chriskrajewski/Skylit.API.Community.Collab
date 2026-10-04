@@ -32,9 +32,9 @@ inside the other) is dropped, so the kept violations are independent:
   ``config_id`` holding a fake secret that fails its pattern.
 
 The tree is emitted as YAML with a dumper that writes a mapping as key/value
-pairs, so a key can repeat, and loaded with ``load_text``. A counterexample
-the property found (``data.instruments.es_levels: NQ``) is pinned with
-``@example`` so it runs every time.
+pairs, so a key can repeat, and loaded with ``load_text``. Two counterexamples
+the property found (``data.instruments.es_levels: NQ`` and ``schema_version:
+2**63``) are pinned with ``@example`` so they run every time.
 
 **Oracle.** Req 17.4: the result is ``LoadErr`` (no config, so no Decision_Time
 can run) and the multiset of (key path, kind) of its errors equals the one of
@@ -667,7 +667,18 @@ ES_LEVELS_NQ: Final = Violation(
 )
 
 
+# Another one: a ``schema_version`` beyond 64 bits failed pydantic's integer
+# parsing, so its error gave a parser message instead of "one of 1".
+HUGE_SCHEMA_VERSION: Final = Violation(
+    "out of range",
+    ("schema_version",),
+    Want("schema_version", KIND_OUT_OF_RANGE, "one of 1", shows_value=True),
+    sets=(("schema_version", 2**63),),
+)
+
+
 @example(MINIMAL, (ES_LEVELS_NQ,))
+@example(MINIMAL, (HUGE_SCHEMA_VERSION,))
 @given(st.sampled_from(BASES), violation_sets())
 def test_validation_reports_every_violation(base: Tree, injected: tuple[Violation, ...]) -> None:
     text = emit(base, injected)

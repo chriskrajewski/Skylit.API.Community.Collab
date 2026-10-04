@@ -38,6 +38,12 @@ QQQ, a 600-3600 s Decision_Cadence, every Gate off (so priced setups are
 A_Plus) or a random subset or all on, and random exits, sizing, Cancel_Trigger,
 Kill_Switch and account settings.
 
+**Pinned early close** (:func:`early_close_hold`, :func:`fixed_config`): the
+2026-03-06 session with bars only from 09:20 to 09:31 and at the Flat_Deadline.
+With every Gate and size-down rule off, an MNQ trade fills on the 09:30 bar
+and is still open at 13:00, so the Flat_Deadline close fills it on the bar that
+opens at 13:00 (Observation_Time 13:01). It does so at 60, 600, 900 and 1800 s.
+
 **Running** (:func:`run`): :func:`fse.backtest.runner.run_backtest` on a cache
 written by :func:`write_cache`, with a constant manifest clock and a fixed
 code version, so equal inputs give byte-identical output files.
@@ -84,8 +90,13 @@ __all__ = [
     "SEED",
     "SYMBOLS",
     "VIEW",
+    "BarOpens",
     "MarketInputs",
     "SessionInputs",
+    "bar_opens",
+    "build_session",
+    "early_close_hold",
+    "fixed_config",
     "make_bar",
     "make_snapshot",
     "market_inputs",
@@ -301,23 +312,37 @@ def _walk(
     return out
 
 
-@st.composite
-def _bar_opens(draw: st.DrawFn, session: date) -> tuple[tuple[Instant, ...], frozenset[Instant]]:
-    """Bar opens of one session: one or two segments, then the Flat_Deadline bar."""
+type BarOpens = tuple[tuple[Instant, ...], frozenset[Instant]]
+"""Bar open times in order, and the opens that start a new segment (a gap open)."""
+
+
+def bar_opens(session: date, segment_1: int, segment_2: tuple[int, int] | None) -> BarOpens:
+    """``segment_1`` bars from 09:20, then ``(start, length)`` bars from 09:30 + ``start``
+    minutes if given, then the Flat_Deadline bar."""
     rth_open = CALENDAR.rth_open(session)
     deadline = CALENDAR.flat_deadline(session)
     first = ny_instant(session, time(9, 20))
-    opens = [first + k * MINUTE for k in range(draw(st.integers(12, 75), label="segment 1"))]
+    opens = [first + k * MINUTE for k in range(segment_1)]
     gaps: set[Instant] = set()
-    latest = (deadline - rth_open) // MINUTE - 50
-    if draw(st.booleans(), label="segment 2"):
-        start = rth_open + draw(st.integers(70, latest), label="segment 2 start") * MINUTE
-        length = draw(st.integers(5, 45), label="segment 2 length")
-        opens.extend(start + k * MINUTE for k in range(length))
+    if segment_2 is not None:
+        start = rth_open + segment_2[0] * MINUTE
+        opens.extend(start + k * MINUTE for k in range(segment_2[1]))
         gaps.add(start)
     opens.append(deadline)
     gaps.add(deadline)
     return tuple(opens), frozenset(gaps)
+
+
+@st.composite
+def _bar_opens(draw: st.DrawFn, session: date) -> BarOpens:
+    """Bar opens of one session: one or two segments, then the Flat_Deadline bar."""
+    segment_1 = draw(st.integers(12, 75), label="segment 1")
+    latest = (CALENDAR.flat_deadline(session) - CALENDAR.rth_open(session)) // MINUTE - 50
+    segment_2: tuple[int, int] | None = None
+    if draw(st.booleans(), label="segment 2"):
+        start = draw(st.integers(70, latest), label="segment 2 start")
+        segment_2 = (start, draw(st.integers(5, 45), label="segment 2 length"))
+    return bar_opens(session, segment_1, segment_2)
 
 
 def random_pairs(rng: random.Random, symbol: str) -> list[tuple[float, float]]:
@@ -349,29 +374,40 @@ def random_bar(rng: random.Random, instrument: str, open_ns: Instant, near: Tick
 @st.composite
 def session_inputs(draw: st.DrawFn, session: date, *, gaps: bool = False) -> SessionInputs:
     """One session of inputs (see the module notes)."""
-    rng = random.Random(draw(st.integers(0, 2**32 - 1), label="seed"))
+    seed = draw(st.integers(0, 2**32 - 1), label="seed")
+    _, pull_end = CALENDAR.pull_window(session)
+    rth_open = CALENDAR.rth_open(session)
+    opens = draw(_bar_opens(session))
+    extra_times = draw(
+        st.lists(
+            st.sampled_from(opens[0][:-1]).map(lambda o: o + 30 * SECOND)
+            | st.integers(rth_open, pull_end - SECOND),
+            max_size=3,
+        ),
+        label="extra Snapshot times",
+    )
+    return build_session(session, seed, opens, extra_times, gaps=gaps)
+
+
+def build_session(
+    session: date,
+    seed: int,
+    opens: BarOpens,
+    extra_times: Iterable[Instant] = (),
+    *,
+    gaps: bool = False,
+) -> SessionInputs:
+    """One session of inputs from a seed, its bar opens and extra Snapshot times."""
+    rng = random.Random(seed)
     pull_start, pull_end = CALENDAR.pull_window(session)
     rth_open = CALENDAR.rth_open(session)
-    opens, gap_after = draw(_bar_opens(session))
-
-    extra_times = sorted(
-        set(
-            draw(
-                st.lists(
-                    st.sampled_from(opens[:-1]).map(lambda o: o + 30 * SECOND)
-                    | st.integers(rth_open, pull_end - SECOND),
-                    max_size=3,
-                ),
-                label="extra Snapshot times",
-            )
-        )
-    )
-    extra_times = [t for t in extra_times if pull_start <= t < pull_end]
+    opens_ns, gap_after = opens
+    extra = [t for t in sorted(set(extra_times)) if pull_start <= t < pull_end]
     base_at = ny_instant(session, time(9, 29, 30))
     snapshots: list[Snapshot] = []
     for symbol, metric in KEYS:
         pairs = random_pairs(rng, symbol)
-        times = [t for t in extra_times if rng.random() < 0.6]
+        times = [t for t in extra if rng.random() < 0.6]
         if not times or rng.random() < 0.85:
             times.insert(0, base_at)
         for t in times:
@@ -379,7 +415,7 @@ def session_inputs(draw: st.DrawFn, session: date, *, gaps: bool = False) -> Ses
             snapshots.append(make_snapshot(session, symbol, metric, t, spot, pairs))
             pairs = _changed(rng, pairs)
 
-    bars = [b for i in INSTRUMENTS for b in _walk(rng, i, opens, gap_after)]
+    bars = [b for i in INSTRUMENTS for b in _walk(rng, i, opens_ns, gap_after)]
     if gaps and rng.random() < 0.25:
         if rng.random() < 0.5:
             symbol, metric = rng.choice(KEYS)
@@ -472,6 +508,26 @@ def strategy_configs(draw: st.DrawFn) -> StrategyConfig:
         }
     )
     return StrategyConfig.model_validate(data)
+
+
+def fixed_config(cadence_s: int) -> StrategyConfig:
+    """The minimal config for SPX and QQQ with every Gate and size-down rule off."""
+    data = minimal_config_data()
+    data.update(
+        {
+            "time": {"decision_cadence_s": cadence_s},
+            "data": {"symbols": list(SYMBOLS), "nq_sources": ["QQQ"]},
+            "gates": {g: {"enabled": False} for g in GATE_IDS},
+            "sizing": {"trinity_size_down": {"enabled": False}, "vix_gap": {"enabled": False}},
+        }
+    )
+    return StrategyConfig.model_validate(data)
+
+
+def early_close_hold() -> MarketInputs:
+    """The pinned early-close session (module notes): a trade open into the Flat_Deadline."""
+    opens = bar_opens(EARLY_CLOSE_DAY, 12, None)
+    return MarketInputs((build_session(EARLY_CLOSE_DAY, 6407, opens),))
 
 
 # ---------------------------------------------------------------- the cache

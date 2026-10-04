@@ -32,6 +32,11 @@ Checked: the two decision logs hold the same lines, byte for byte, for every
 Decision_Time at or before ``t``, and that is every evaluated Decision_Time at
 or before ``t``.
 
+Pinned example: the early-close session of
+:func:`~tests.strategies.backtest_inputs.early_close_hold` at 1800 s with ``t``
+the 13:00 Flat_Deadline. Its trade is closed at the open of the bar that opens
+at 13:00, which is observed at 13:01, so the 13:00 entry must not show it.
+
 **Validates: Requirements 5.3, 5.4, 5.11, 9.1**
 """
 
@@ -43,8 +48,9 @@ import tempfile
 from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path
+from typing import Final
 
-from hypothesis import event, given
+from hypothesis import event, example, given
 from hypothesis import strategies as st
 
 from fse.backtest.decision_log import DECISION_LOG_FILE_NAME
@@ -61,6 +67,8 @@ from tests.strategies.backtest_inputs import (
     MINUTE,
     MarketInputs,
     SessionInputs,
+    early_close_hold,
+    fixed_config,
     make_snapshot,
     market_inputs,
     random_bar,
@@ -228,8 +236,13 @@ def lines_until(result: BacktestResult, cut: Instant) -> list[str]:
     return [line for line in text.splitlines() if json.loads(line)["t"] <= cut]
 
 
+EARLY_CLOSE: Final = early_close_hold()
+EARLY_CLOSE_CUT: Final = CALENDAR.flat_deadline(EARLY_CLOSE.sessions[0].session)
+
+
 # Feature: skylit-futures-strategy-engine, Property 14: No look-ahead
 @given(case=cases())
+@example(case=Case(EARLY_CLOSE, fixed_config(1800), EARLY_CLOSE_CUT, 0))
 def test_inputs_after_t_do_not_change_entries_at_or_before_t(case: Case) -> None:
     changed = after_cut(case.market, case.cut, case.seed)
     if changed != case.market:
