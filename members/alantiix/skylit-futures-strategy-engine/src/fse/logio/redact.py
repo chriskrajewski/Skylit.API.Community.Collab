@@ -85,6 +85,10 @@ class Redactor:
         """A Redactor for every non-blank Secret_Variable value in ``env``."""
         return cls(env.secret_values())
 
+    def __reduce__(self) -> tuple[type[Redactor], tuple[tuple[str, ...]]]:
+        """Pickle by value, so an Experiment_Runner worker process redacts the same values."""
+        return (Redactor, (tuple(e.value for e in self._state.entries),))
+
     def add(self, value: str) -> None:
         """Register ``value``, for example a ProjectX session token as it arrives.
 

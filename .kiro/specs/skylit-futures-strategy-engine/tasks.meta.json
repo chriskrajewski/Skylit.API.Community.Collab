@@ -251,6 +251,10 @@
     "24.3 Write property test for estimate accounting": {
       "status": "passed",
       "lastRunTimestamp": 1791133520627
+    },
+    "25.2 Write property test for ablation variants": {
+      "status": "passed",
+      "lastRunTimestamp": 1791135599409
     }
   },
   "executionHistory": {

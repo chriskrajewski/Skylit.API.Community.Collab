@@ -778,8 +778,8 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
     - No passing paths, fewer than the minimum sessions, and out-of-range inputs
     - _Requirements: 21.7, 21.11, 21.12_
 
-- [ ] 25. Experiment_Runner and ablation
-  - [ ] 25.1 Implement the shared experiment runner and ablation
+- [x] 25. Experiment_Runner and ablation
+  - [x] 25.1 Implement the shared experiment runner and ablation
     - `src/fse/experiments/runner.py` (shared by every experiment):
       - the same session list and seed for every configuration
       - Holdout_Period sessions excluded, with their dates in every manifest
@@ -789,7 +789,7 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
     - `src/fse/experiments/variants.py` and `src/fse/experiments/ablation.py`: N + 1 configurations and their deltas
     - _Requirements: 19.13, 19.14, 19.15, 19.16, 22.2, 22.3, 22.15, 22.16_
 
-  - [ ] 25.2 Write property test for ablation variants
+  - [x] 25.2 Write property test for ablation variants
     - **Property 59: Ablation variants**
     - **Validates: Requirements 19.13, 19.14, 19.15, 19.16**
 

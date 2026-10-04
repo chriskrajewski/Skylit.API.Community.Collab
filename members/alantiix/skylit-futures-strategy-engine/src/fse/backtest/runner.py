@@ -196,8 +196,10 @@ __all__ = [
     "SessionOutcome",
     "WindowGap",
     "backtest_range",
+    "cache_holdout",
     "check_sessions",
     "default_run_id",
+    "has_first_target",
     "offline_gap_lines",
     "resolve_seed",
     "run_backtest",
@@ -1059,7 +1061,14 @@ def run_backtest(
             dark_pool_lookback=dp.lookback_sessions,
             node_params=params.node_params,
         )
-        holdout = _holdout(cfg, cache, calendar, load_spec)
+        holdout = _holdout(
+            cfg,
+            cache,
+            calendar,
+            symbols=load_spec.symbols,
+            view_id=load_spec.view_id,
+            instruments=load_spec.instruments,
+        )
         log_path = run_dir / DECISION_LOG_FILE_NAME
         with DecisionLog(writer, log_path) as log:
             rec.output(log_path)
@@ -1122,20 +1131,40 @@ def run_backtest(
     )
 
 
-def _holdout(
-    cfg: StrategyConfig, cache: DataCache, calendar: SessionCalendar, spec: _LoadSpec
+def cache_holdout(
+    cfg: StrategyConfig, cache: DataCache, calendar: SessionCalendar
 ) -> HoldoutPeriod | None:
     """The Holdout_Period of the calendar sessions the cache holds full data for (Req 22.1).
 
-    ``None`` when no session has full data.
+    Full data means a Snapshot for each of ``cfg``'s symbols and metrics and
+    bars for each of its instruments. ``None`` when no session has full data.
     """
+    return _holdout(
+        cfg,
+        cache,
+        calendar,
+        symbols=tuple(cfg.data.symbols),
+        view_id=heatmap_view(cfg.data.heatmap_view).view_id(),
+        instruments=EngineParams.from_sections(cfg).instruments,
+    )
+
+
+def _holdout(
+    cfg: StrategyConfig,
+    cache: DataCache,
+    calendar: SessionCalendar,
+    *,
+    symbols: Sequence[str],
+    view_id: str,
+    instruments: Sequence[str],
+) -> HoldoutPeriod | None:
     checks = check_sessions(
         cache,
         calendar,
         calendar.sessions(),
-        symbols=spec.symbols,
-        view_id=spec.view_id,
-        instruments=spec.instruments,
+        symbols=symbols,
+        view_id=view_id,
+        instruments=instruments,
     )
     with_data = [c.session for c in checks if not c.skip]
     if not with_data:
@@ -1146,7 +1175,7 @@ def _holdout(
         return None
 
 
-def _has_first_target(cfg: StrategyConfig) -> bool:
+def has_first_target(cfg: StrategyConfig) -> bool:
     """Whether an Exit_Mode the config can select sets a first target (not Trailing)."""
     modes = {cfg.exits.setting_for(regime).mode for regime in (None, *EXIT_REGIMES)}
     return modes != {"trailing"}
@@ -1191,7 +1220,7 @@ def _report_inputs(
                 "scratch_tolerance_r": Decimal(repr(rep.scratch_tolerance_r)),
                 "min_sample_trades": rep.min_sample_trades,
                 "primary_win_rate": rep.primary_win_rate,
-                "has_first_target": _has_first_target(cfg),
+                "has_first_target": has_first_target(cfg),
             },
             "shadow_min_sample": rep.shadow_min_sample,
             "enabled_gates": list(enabled),
