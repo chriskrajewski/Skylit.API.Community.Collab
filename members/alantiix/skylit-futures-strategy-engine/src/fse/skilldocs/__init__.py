@@ -8,7 +8,9 @@ The Skill_Documents live in the sibling member project
 - ``<FINE_TUNE_DIR>/TASK.md``
 
 Revised_Drafts are written to ``<FINE_TUNE_DIR>/`` as
-``revised_SKILL_{date}.md`` and ``revised_TASK_{date}.md``.
+``revised_SKILL_{date}.md`` and ``revised_TASK_{date}.md``
+(:mod:`fse.skilldocs.drafts`); the Operator's approvals are
+``<FINE_TUNE_DIR>/approvals.yaml`` (:mod:`fse.skilldocs.approvals`).
 
 Every module in this package takes the fine-tune folder from
 :data:`FINE_TUNE_DIR` and from nowhere else.
@@ -20,9 +22,12 @@ from pathlib import Path
 from typing import Final
 
 __all__ = [
+    "APPROVALS_FILE",
     "FINE_TUNE_DIR",
     "REVISED_SKILL_GLOB",
+    "REVISED_SKILL_PREFIX",
     "REVISED_TASK_GLOB",
+    "REVISED_TASK_PREFIX",
     "SKILL_FILE",
     "SKILL_ROOT_NAME",
     "TASK_FILE",
@@ -43,6 +48,10 @@ WORKING_SKILL_FILE: Final = "current_working_SKILL_100226.md"
 TASK_FILE: Final = "TASK.md"
 REVISED_SKILL_GLOB: Final = "revised_SKILL_*.md"
 REVISED_TASK_GLOB: Final = "revised_TASK_*.md"
+REVISED_SKILL_PREFIX: Final = "revised_SKILL_"
+REVISED_TASK_PREFIX: Final = "revised_TASK_"
+# The Operator's draft approvals, in the fine-tune folder (design §26, Req 26.18).
+APPROVALS_FILE: Final = "approvals.yaml"
 
 
 def default_skill_root(project_dir: Path) -> Path:

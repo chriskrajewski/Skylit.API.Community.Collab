@@ -20,9 +20,11 @@ from fse.commands import skilldocs as skilldocs_command
 from fse.secrets.env import EnvView
 from fse.skilldocs import FINE_TUNE_DIR, SKILL_ROOT_NAME
 from fse.skilldocs.check import (
+    ENGINE_DECIDES_RULE,
     EXIT_FAILED,
     EXIT_PASSED,
     EXIT_UNREADABLE,
+    RESTATEMENT_RULE,
     Check,
     SkillDocsError,
     check_document,
@@ -44,6 +46,8 @@ GOOD = (
 # Two blocks with one blank line between: the second starts on line 6.
 STACKED = "---\nname: a\ndescription: b\n---\n\n---\nname: a\ndescription: fuller b\n---\nbody\n"
 TASK = f"You are a test copilot. {BODY_TOKEN}\n"
+# Revised_Drafts also get the draft lint (task 30.1), which needs both rules.
+DRAFT_RULES = f"{RESTATEMENT_RULE}\n{ENGINE_DECIDES_RULE}\n"
 
 
 def failures(
@@ -180,9 +184,10 @@ def test_checks_the_skill_documents_then_each_revised_draft(tmp_path: Path) -> N
     _write(
         root / FINE_TUNE_DIR,
         {
-            "revised_SKILL_2026-02-01.md": STACKED,
-            "revised_SKILL_2026-01-01.md": GOOD,
-            "revised_TASK_2026-01-01.md": TASK,  # task drafts may omit front matter
+            "revised_SKILL_2026-02-01.md": STACKED + DRAFT_RULES,
+            "revised_SKILL_2026-01-01.md": GOOD + DRAFT_RULES,
+            # task drafts may omit front matter
+            "revised_TASK_2026-01-01.md": TASK + DRAFT_RULES,
             "notes.md": STACKED,  # neither a Skill_Document nor a Revised_Draft
         },
     )

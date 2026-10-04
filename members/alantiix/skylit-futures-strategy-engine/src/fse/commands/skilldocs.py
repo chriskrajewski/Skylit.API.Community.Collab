@@ -41,6 +41,19 @@ and each Revised_Draft (revised_SKILL_*.md, revised_TASK_*.md):
   utf-8             the file is valid UTF-8 with no U+FFFD
   no-secret         the file holds no Secret_Variable value
 
+Each Revised_Draft also gets the draft lint:
+
+  narrator-rules        it holds the Narrator restatement rule and the
+                        engine-decides rule
+  no-forecast           no line with a performance figure holds "target",
+                        "expect", "will" or another forecast word
+  no-trade-instruction  no sentence tells the Narrator to take, skip, size
+                        or exit a trade, to place, modify or cancel an
+                        order, or to change the Order_Mode
+  figure-provenance     every performance figure line holds its trade
+                        count, session count, labeled dates and config hash
+                        (and the path count for a Combine_Pass probability)
+
 Each failed check is printed as "<path>: <check>: <reason>". No file content
 and no secret value is ever printed. Secret values are read from the shell
 environment and from the .env file in the Project folder."""

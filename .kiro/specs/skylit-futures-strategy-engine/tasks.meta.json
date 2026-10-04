@@ -287,6 +287,14 @@
     "27.7 Write property test for the cadence comparison": {
       "status": "passed",
       "lastRunTimestamp": 1791144406528
+    },
+    "30.3 Write property test for draft labels and comparison configs": {
+      "status": "passed",
+      "lastRunTimestamp": 1791155507790
+    },
+    "30.4 Write property test for promotion": {
+      "status": "passed",
+      "lastRunTimestamp": 1791155507790
     }
   },
   "executionHistory": {

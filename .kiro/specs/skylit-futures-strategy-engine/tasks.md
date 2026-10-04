@@ -882,8 +882,8 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
 - [x] 29. Checkpoint - Measurement complete
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 30. Revised_Drafts
-  - [ ] 30.1 Implement the Revised_Drafts builder
+- [x] 30. Revised_Drafts
+  - [x] 30.1 Implement the Revised_Drafts builder
     - `src/fse/skilldocs/drafts.py`, templates under `src/fse/skilldocs/templates/` (holding the Narrator restatement rule and the engine-decides rule), and `src/fse/commands/drafts.py` (`fse drafts build --chosen <config>`). The builder:
       - labels each rule Kept, Changed or Removed
       - runs one comparison config per rule on the pre-holdout sessions
@@ -893,19 +893,19 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
     - Extend `src/fse/skilldocs/check.py` with the draft lint
     - _Requirements: 26.9, 26.10, 26.11, 26.12, 26.13, 26.14, 26.15, 26.16, 26.17_
 
-  - [ ] 30.2 Implement draft approval and promotion
+  - [x] 30.2 Implement draft approval and promotion
     - `src/fse/skilldocs/approvals.py` (sha256 approvals in `approvals.yaml`) and `fse drafts promote` in `src/fse/commands/drafts.py`. Promotion is the only code path that writes `SKILL.md`
     - _Requirements: 26.18_
 
-  - [ ] 30.3 Write property test for draft labels and comparison configs
+  - [x] 30.3 Write property test for draft labels and comparison configs
     - **Property 85: Draft labels and comparison configs**
     - **Validates: Requirements 26.10, 26.11**
 
-  - [ ] 30.4 Write property test for promotion
+  - [x] 30.4 Write property test for promotion
     - **Property 86: Promotion requires approval**
     - **Validates: Requirements 26.18**
 
-  - [ ] 30.5 Write smoke test for the draft templates
+  - [x] 30.5 Write smoke test for the draft templates
     - The templates pass the lint and hold the Narrator restatement rule and the engine-decides rule
     - _Requirements: 26.13, 26.14, 26.16_
 
