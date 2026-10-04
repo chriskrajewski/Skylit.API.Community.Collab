@@ -1,0 +1,13 @@
+{
+ "slice": "001_2026-07-07_to_2026-08-11",
+ "schema": 1,
+ "exporter_version": 1,
+ "signals": 81,
+ "days": 22,
+ "first_day": "2026-07-07",
+ "last_day": "2026-08-11",
+ "long": 42,
+ "short": 39,
+ "signals_sha256": "9383eb4d65dfd936ac16df432d6cc1d0fd04ab4d9557a2e0d635b306c514d3b7",
+ "frozen": "Do not edit this folder after publishing. Corrections ship as a new slice."
+}

@@ -1,0 +1,75 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "title": "pckt-bench trade log",
+ "type": "object",
+ "required": [
+  "runs"
+ ],
+ "properties": {
+  "slice": {
+   "type": "string"
+  },
+  "runs": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "required": [
+     "signal_id",
+     "trades"
+    ],
+    "properties": {
+     "signal_id": {
+      "type": "string"
+     },
+     "trades": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "required": [
+        "symbol",
+        "side",
+        "open_time"
+       ],
+       "properties": {
+        "symbol": {
+         "enum": [
+          "SPY",
+          "QQQ"
+         ]
+        },
+        "side": {
+         "enum": [
+          "long",
+          "short"
+         ]
+        },
+        "open_time": {
+         "type": "integer",
+         "description": "UTC epoch of the decision minute; fills at the OPEN of the bar starting then"
+        },
+        "close_time": {
+         "type": [
+          "integer",
+          "null"
+         ],
+         "description": "decision minute for the exit; null = grader closes at the forced close"
+        },
+        "reason": {
+         "type": "string",
+         "description": "optional audit note, ignored by scoring"
+        }
+       }
+      }
+     },
+     "decisions": {
+      "type": "array",
+      "description": "optional decision log (every wake-up incl. holds), ignored by scoring",
+      "items": {
+       "type": "object"
+      }
+     }
+    }
+   }
+  }
+ }
+}
