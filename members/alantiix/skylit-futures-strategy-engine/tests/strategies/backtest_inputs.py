@@ -44,6 +44,12 @@ With every Gate and size-down rule off, an MNQ trade fills on the 09:30 bar
 and is still open at 13:00, so the Flat_Deadline close fills it on the bar that
 opens at 13:00 (Observation_Time 13:01). It does so at 60, 600, 900 and 1800 s.
 
+**Pinned opposing trades** (:func:`opposing_hold`): 2026-03-02, seed 5000,
+bars from 09:20 to 09:57 and at the Flat_Deadline, at 60 s with
+``max_open: 2`` and no Cancel_Trigger. A long and a short MES trade are both
+open at the Flat_Deadline; the Account_Simulator nets them to no position, and
+each still closes at the open of the deadline bar.
+
 **Running** (:func:`run`): :func:`fse.backtest.runner.run_backtest` on a cache
 written by :func:`write_cache`, with a constant manifest clock and a fixed
 code version, so equal inputs give byte-identical output files. Its
@@ -566,6 +572,16 @@ def early_close_hold() -> MarketInputs:
     """The pinned early-close session (module notes): a trade open into the Flat_Deadline."""
     opens = bar_opens(EARLY_CLOSE_DAY, 12, None)
     return MarketInputs((build_session(EARLY_CLOSE_DAY, 6407, opens),))
+
+
+def opposing_hold() -> tuple[MarketInputs, StrategyConfig]:
+    """The pinned opposing trades (module notes): a long and a short MES at the Flat_Deadline."""
+    day = SESSIONS[0]
+    market = MarketInputs((build_session(day, 5000, bar_opens(day, 38, None), gaps=True),))
+    data = fixed_config(60).model_dump(mode="python", by_alias=True)
+    data["orders"]["max_open"] = 2
+    data["orders"]["cancel_triggers"] = {t: False for t in data["orders"]["cancel_triggers"]}
+    return market, StrategyConfig.model_validate(data)
 
 
 # ---------------------------------------------------------------- the cache

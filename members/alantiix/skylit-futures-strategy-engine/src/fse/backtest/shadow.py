@@ -67,6 +67,7 @@ from fse.engine.planner import (
     OrderBook,
     OrderFill,
     OrderIntent,
+    PlaceBracket,
     PlacementRejection,
     Plan,
     PlannerConfig,
@@ -284,7 +285,11 @@ def _tap_starts(taps: TapState, session: date) -> dict[tuple[NodeId, int], Insta
 
 
 def _decision_cause(d: SetupDecision) -> tuple[str, ...] | None:
-    """What blocked the entry of ``d`` at its Decision_Time, if anything."""
+    """What blocked the entry of ``d`` at its Decision_Time, if anything.
+
+    Only for a key whose entry was never placed: a later emission of a placed
+    key blocks nothing, since the key is never placed twice.
+    """
     if isinstance(d.sizing, SizingRejection):
         return (d.sizing.reason, d.sizing.step)
     p = d.placement
@@ -326,6 +331,7 @@ class ShadowBook:
         self._live: dict[int, _Shadow] = {}
         self._entry_fill: dict[SetupKey, Instant] = {}
         self._causes: dict[SetupKey, tuple[str, ...]] = {}
+        self._placed: set[SetupKey] = set()
         self._last_bar: dict[str, Bar] = {}
 
     @property
@@ -453,6 +459,7 @@ class ShadowBook:
         self._session = None
         self._tracks, self._open, self._live = {}, {}, {}
         self._entry_fill, self._causes, self._last_bar = {}, {}, {}
+        self._placed = set()
         return tuple(out)
 
     # ------------------------------------------------------------ internals
@@ -460,9 +467,14 @@ class ShadowBook:
     def _record_causes(self, payload: DecisionPayload, session: date) -> None:
         causes = self._causes
         for d in payload.setups:
+            key = d.setup.key
+            if isinstance(d.placement, PlaceBracket):
+                self._placed.add(key)
+            if key in self._placed:
+                continue
             cause = _decision_cause(d)
             if cause is not None:
-                causes[d.setup.key] = cause
+                causes[key] = cause
         for e in payload.management:
             if isinstance(e, EntryCancelled) and e.key.session == session:
                 causes[e.key] = tuple(e.causes)

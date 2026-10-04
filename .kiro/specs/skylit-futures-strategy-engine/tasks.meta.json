@@ -230,7 +230,7 @@
     },
     "22.6 Write property test for funnel accounting": {
       "status": "passed",
-      "lastRunTimestamp": 1791105511295
+      "lastRunTimestamp": 1791111095514
     },
     "22.7 Write property test that shadow trades do not leak": {
       "status": "passed",

@@ -32,8 +32,10 @@ the trade list and a reference Tap count over the stored bars
   the co-rejection matrix and the per-session top 3 recomputed from the
   rejected records alone.
 
-Pinned example: :func:`~tests.strategies.backtest_inputs.funnel_case`, a run
-with every final status and nine Shadow_Trades.
+Pinned examples: :func:`~tests.strategies.backtest_inputs.funnel_case`, a run
+with every final status and nine Shadow_Trades, and
+:func:`~tests.strategies.backtest_inputs.opposing_hold`, a long and a short
+MES trade both open at the Flat_Deadline.
 
 **Validates: Requirements 19.1, 19.3, 19.4, 19.5, 19.6, 19.7, 19.8, 19.17**
 """
@@ -66,6 +68,7 @@ from tests.strategies.backtest_inputs import (
     MarketInputs,
     funnel_case,
     market_inputs,
+    opposing_hold,
     run,
     strategy_configs,
     with_cadence,
@@ -96,10 +99,12 @@ def emissions(log: str) -> dict[str, list[Emission]]:
 
 
 PINNED = funnel_case()
+OPPOSING = opposing_hold()
 
 
 # Feature: skylit-futures-strategy-engine, Property 56: Funnel accounting
 @example(market=PINNED[0], cfg=PINNED[1], cadence=300)
+@example(market=OPPOSING[0], cfg=OPPOSING[1], cadence=60)
 @given(
     market=market_inputs(gaps=True, max_sessions=2),
     cfg=strategy_configs(),

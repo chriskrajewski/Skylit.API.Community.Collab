@@ -11,7 +11,9 @@ this order:
    (Req 20.13) and each undefined value shown as "not applicable" (Req 20.16);
 3. the Gate_Funnel: final statuses, cancel causes, the per-Gate table with
    the only-rejected Shadow_Trades and flags beside the accepted trades, the
-   co-rejection matrix and the per-session top 3 (Req 19);
+   co-rejection matrix and the per-session top 3 (Req 19), with win rate and
+   mean R_Multiple shown as "not available" when the filled count is 0
+   (Req 19.10);
 4. the King and Gatekeeper agreement rates (Req 6.22-6.23);
 5. the Tap counts per session (Req 18.11).
 
@@ -196,6 +198,9 @@ def _metrics(m: Metrics) -> list[str]:
 
 
 def _stats(s: Mapping[str, Any]) -> tuple[str, str, str]:
+    """Filled count, win rate and mean R; "not available" with 0 filled (Req 19.10)."""
+    if s["filled"] == 0:
+        return "0", NOT_AVAILABLE, NOT_AVAILABLE
     return str(s["filled"]), _pct(s["win_rate_pct"]), _r(s["mean_r"])
 
 

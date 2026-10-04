@@ -872,11 +872,14 @@ class _Loop:
         flat: list[tuple[Bar, FillEvent]] = []
         for event in self._account.end_trading_day(closing):
             if isinstance(event, FlatDeadlineClose):
-                prices = {e.instrument: e.price for e in event.exits}
-                priced = {
-                    (t.instrument, t.direction): (closing[t.instrument], prices[t.instrument])
-                    for t in self.book.trades.values()
-                }
+                # Every trade closes at the open of its instrument's deadline bar (Req 15.16),
+                # the price the account closes its net position at. A long and a short of one
+                # instrument can net to no account position, so the bar gives the price.
+                priced: dict[tuple[str, Direction], tuple[Bar, Ticks]] = {}
+                for t in self.book.trades.values():
+                    bar = closing[t.instrument]
+                    assert bar.o_t is not None  # futures bars carry tick prices
+                    priced[(t.instrument, t.direction)] = (bar, bar.o_t)
                 flat = self._close(priced, "flat_deadline", deadline)
         if self.book.trades:
             raise ValueError(f"{data.session}: open trades remain after the Flat_Deadline")

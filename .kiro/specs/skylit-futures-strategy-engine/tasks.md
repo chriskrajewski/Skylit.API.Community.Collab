@@ -751,7 +751,7 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
     - Not-applicable metrics, trade count 0, and the report finishes
     - _Requirements: 20.16_
 
-- [ ] 23. Checkpoint - Operator runs the Playbook_Baseline backtest and Gate_Funnel
+- [x] 23. Checkpoint - Operator runs the Playbook_Baseline backtest and Gate_Funnel
   - Ensure all tests pass, ask the user if questions arise.
   - Operator: run `fse backtest --config configs/playbook_baseline.yaml --start <first cached session> --end <last session before the Holdout_Period> --offline`, then `fse report --run <run_id>`. If the report header says Holdout_Period sessions are included, rerun with an earlier end date.
   - Operator: read the funnel: status counts, first-failing Gates, only-failing shadow trades, and the per-session top 3 Gates. These show why the bot rarely trades.
