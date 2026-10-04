@@ -103,3 +103,5 @@ def test_pareto_set(points: list[Point]) -> None:
     rows_json = out["rows"]
     assert isinstance(rows_json, list)
     assert [r["pareto"] for r in rows_json] == list(statuses)  # type: ignore[index,call-overload]
+    # Req 20.14 ranks two or more configurations; one row has no ranking.
+    assert (out["ranking"] is None) == (len(rows) < 2)

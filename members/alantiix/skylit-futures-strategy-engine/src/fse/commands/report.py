@@ -47,7 +47,8 @@ EXIT_INVALID_INPUT: Final = 2
 
 _DESCRIPTION = """\
 Write the report of a completed backtest run: the header (sessions, trades,
-data resolution, fills and costs, Holdout_Period), the metrics, the
+data resolution, fills and costs, Holdout_Period), the metrics with their
+95% bootstrap intervals, the
 Gate_Funnel with the Shadow_Trades of rejected setups, the King and Gatekeeper
 agreement and the Tap counts per session.
 

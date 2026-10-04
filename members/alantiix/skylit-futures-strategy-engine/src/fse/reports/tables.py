@@ -10,6 +10,10 @@ the Run_Manifest, the accepted trades, the Gate_Funnel and the report inputs.
   fills (optimistic)" label when the trade-through distance is 0 (Req 13.2);
 - the run metrics (``fse.analytics.metrics.summarize``, Req 20.1-20.6,
   20.13, 20.16) over the evaluated sessions;
+- the 95% percentile bootstrap intervals of the Primary_Win_Rate and
+  expectancy in R that the Backtester drew with the run's seed (Req 20.12),
+  read back from the report inputs (``None`` for a run directory written
+  before they were recorded);
 - the Gate_Funnel as the run wrote it (Req 19.6-19.7, 19.10-19.12, 19.17);
 - the King and Gatekeeper agreement rates (Req 6.22-6.23);
 - the Tap count and inter-decision Tap count of each evaluated session; a
@@ -35,6 +39,7 @@ from fractions import Fraction
 from pathlib import Path
 from typing import Any, ClassVar, Final
 
+from fse.analytics.bootstrap import BootstrapIntervals, Interval
 from fse.analytics.metrics import Metrics, MetricsCfg, metrics_to_jsonable, summarize
 from fse.backtest.manifest import MANIFEST_FILE_NAME
 from fse.backtest.runner import (
@@ -42,6 +47,7 @@ from fse.backtest.runner import (
     FUNNEL_FILE_NAME,
     REPORT_INPUTS_FILE_NAME,
     TRADES_JSON_FILE_NAME,
+    intervals_to_jsonable,
 )
 from fse.engine.types import Fill, NotApplicable, SetupKey, Trade
 from fse.logio.canonical_json import JsonValue, to_jsonable
@@ -81,6 +87,7 @@ EXCURSION_COLUMNS: Final[tuple[str, ...]] = (
 """The per-trade MAE and MFE file's header (Req 20.6)."""
 
 _PLACES: Final = 6
+_NA_TEXT: Final = "not applicable"
 
 
 class ReportDataError(Exception):
@@ -251,6 +258,36 @@ class RunReport:
     agreement: Agreement
     taps: tuple[TapRow, ...]
     trades: tuple[Trade, ...]
+    intervals: BootstrapIntervals | None = None
+
+
+def _interval(raw: object) -> Interval | NotApplicable:
+    if raw == _NA_TEXT:
+        return NotApplicable()
+    if not isinstance(raw, Mapping):
+        raise ValueError(f"a bootstrap interval must be an object or {_NA_TEXT!r}, got {raw!r}")
+    lower, upper = float(raw["lower"]), float(raw["upper"])
+    if not lower <= upper:
+        raise ValueError(f"a bootstrap interval's lower bound is above its upper bound: {raw!r}")
+    return Interval(lower, upper)
+
+
+def _intervals(raw: object) -> BootstrapIntervals | None:
+    """The bootstrap intervals stored in the report inputs; ``None`` when none were stored."""
+    if raw is None:
+        return None
+    if not isinstance(raw, Mapping):
+        raise ValueError(f"the bootstrap intervals must be an object, got {raw!r}")
+    return BootstrapIntervals(
+        seed=raw["seed"],
+        resamples=raw["resamples"],
+        trade_count=raw["trade_count"],
+        primary_win_rate=raw["primary_win_rate"],
+        primary_win_rate_pct=_interval(raw["primary_win_rate_pct"]),
+        expectancy_r=_interval(raw["expectancy_r"]),
+        low_sample=bool(raw["low_sample"]),
+        confidence_pct=raw["confidence_pct"],
+    )
 
 
 def _dates(values: Iterable[str]) -> tuple[date, ...]:
@@ -332,6 +369,7 @@ def build_report(run: RunData) -> RunReport:
             agreement=agreement,
             taps=_taps(run),
             trades=tuple(t for t in run.trades if not t.shadow),
+            intervals=_intervals(run.inputs.get("bootstrap")),
         )
     except (KeyError, TypeError, ValueError, InvalidOperation) as exc:
         raise ReportDataError(f"the files of run {run.run_dir} are inconsistent: {exc!r}") from None
@@ -403,6 +441,9 @@ def report_jsonable(report: RunReport) -> JsonValue:
                 "measured_not_forecast": True,
             },
             "metrics": metrics_to_jsonable(report.metrics, places=_PLACES),
+            "bootstrap_intervals": None
+            if report.intervals is None
+            else intervals_to_jsonable(report.intervals),
             "gate_funnel": report.funnel,
             "node_agreement": {
                 "compared": a.compared,

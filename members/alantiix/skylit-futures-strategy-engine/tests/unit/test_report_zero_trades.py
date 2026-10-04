@@ -100,12 +100,20 @@ def test_a_zero_trade_run_reports_not_applicable_metrics(tmp_path: Path) -> None
         assert metrics[name] == {}, name  # NotApplicable, never 0 or infinity
     assert report["header"]["trade_count"] == 0
     assert report["gate_funnel"]["setup_keys"] == 0
+    intervals = report["bootstrap_intervals"]
+    assert intervals["trade_count"] == 0
+    assert intervals["primary_win_rate_pct"] == NOT_APPLICABLE  # Req 20.16
+    assert intervals["expectancy_r"] == NOT_APPLICABLE
 
     md = (folder / REPORT_MD_FILE_NAME).read_text(encoding="utf-8")
     assert "| Trade count | 0 |" in md
     assert "| Trades per day | 0.00 |" in md
     for label in ("Average win", "Expectancy (R)", "Profit factor", "Break-even win rate"):
         line = next(x for x in md.splitlines() if x.startswith(f"| {label}"))
+        assert NOT_APPLICABLE in line, line
+    section = md[md.index("## Confidence intervals") :].split("\n## ")[0]
+    for label in ("| Primary_Win_Rate (a) |", "| Expectancy (R) |"):
+        line = next(x for x in section.splitlines() if x.startswith(label))
         assert NOT_APPLICABLE in line, line
     assert "inf" not in md.lower().replace("information", "")
     assert md.index("## Run") < md.index("## Metrics")  # the header comes first

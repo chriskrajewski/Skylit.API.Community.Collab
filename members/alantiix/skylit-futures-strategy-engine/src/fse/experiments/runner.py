@@ -53,12 +53,11 @@ from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import Future, ProcessPoolExecutor
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal
 from pathlib import Path
 from typing import ClassVar, Final, Literal
 
 from fse.analytics.bootstrap import BootstrapIntervals, bootstrap_intervals
-from fse.analytics.metrics import Metrics, MetricsCfg, metrics_to_jsonable, summarize
+from fse.analytics.metrics import Metrics, metrics_to_jsonable, summarize
 from fse.analytics.montecarlo import (
     PassEstimate,
     estimate_to_jsonable,
@@ -72,7 +71,7 @@ from fse.backtest.manifest import (
     SkippedSession,
     run_manifest,
 )
-from fse.backtest.runner import cache_holdout, has_first_target, run_backtest
+from fse.backtest.runner import cache_holdout, metrics_cfg, run_backtest
 from fse.calendars import load_calendars
 from fse.config.hashing import config_hash
 from fse.config.schema import StrategyConfig
@@ -254,17 +253,6 @@ def experiment_sessions(
 
 
 # ---------------------------------------------------------------- the default evaluator
-
-
-def metrics_cfg(cfg: StrategyConfig) -> MetricsCfg:
-    """The :class:`MetricsCfg` of ``cfg``'s ``reporting`` section and Exit_Mode."""
-    rep = cfg.reporting
-    return MetricsCfg(
-        scratch_tolerance_r=Decimal(repr(rep.scratch_tolerance_r)),
-        min_sample_trades=rep.min_sample_trades,
-        primary_win_rate=rep.primary_win_rate,
-        has_first_target=has_first_target(cfg),
-    )
 
 
 def backtest_evaluator(task: EvalTask, writer: LogWriter) -> ConfigResult:

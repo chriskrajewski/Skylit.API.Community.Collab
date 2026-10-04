@@ -9,6 +9,9 @@ this order:
    results, not a forecast;
 2. the metrics (Req 20.1-20.6), each low-sample value labelled next to it
    (Req 20.13) and each undefined value shown as "not applicable" (Req 20.16);
+   then the 95% bootstrap intervals of the Primary_Win_Rate and expectancy
+   in R with their seed and resample count (Req 20.12), labelled low-sample
+   the same way;
 3. the Gate_Funnel: final statuses, cancel causes, the per-Gate table with
    the only-rejected Shadow_Trades and flags beside the accepted trades, the
    co-rejection matrix and the per-session top 3 (Req 19), with win rate and
@@ -27,6 +30,7 @@ from decimal import Decimal
 from fractions import Fraction
 from typing import Any, Final
 
+from fse.analytics.bootstrap import BootstrapIntervals, Interval
 from fse.analytics.metrics import Metrics, Quantiles, round_fraction
 from fse.engine.types import NotApplicable
 from fse.reports.tables import NOT_MEASURABLE, TOUCH_FILLS_LABEL, RunReport
@@ -197,6 +201,44 @@ def _metrics(m: Metrics) -> list[str]:
     return out
 
 
+def _bound(value: float, suffix: str) -> str:
+    return number(Decimal(repr(value)), suffix=suffix)
+
+
+def _span(interval: Interval | NotApplicable, suffix: str) -> str:
+    if isinstance(interval, NotApplicable):
+        return NOT_APPLICABLE
+    return f"{_bound(interval.lower, suffix)} to {_bound(interval.upper, suffix)}"
+
+
+def _intervals(b: BootstrapIntervals | None) -> list[str]:
+    """The 95% bootstrap intervals (Req 20.12), labelled low-sample (Req 20.13)."""
+    out = ["## Confidence intervals", ""]
+    if b is None:
+        out.append(f"Bootstrap intervals: {NOT_AVAILABLE} (the run recorded none).")
+        return out
+
+    def low(text: str) -> str:
+        return f"{text} {LOW_SAMPLE_LABEL}" if b.low_sample else text
+
+    out += [
+        f"{b.confidence_pct}% percentile bootstrap intervals: {b.resamples:,} resamples of the "
+        f"{b.trade_count} accepted trade(s), drawn with replacement; seed {b.seed}.",
+        "",
+        table(
+            ("Metric", f"{b.confidence_pct}% interval"),
+            [
+                (
+                    f"Primary_Win_Rate ({b.primary_win_rate})",
+                    low(_span(b.primary_win_rate_pct, "%")),
+                ),
+                ("Expectancy (R)", low(_span(b.expectancy_r, " R"))),
+            ],
+        ),
+    ]
+    return out
+
+
 def _stats(s: Mapping[str, Any]) -> tuple[str, str, str]:
     """Filled count, win rate and mean R; "not available" with 0 filled (Req 19.10)."""
     if s["filled"] == 0:
@@ -320,6 +362,7 @@ def render(report: RunReport) -> str:
     parts = [
         _header(report),
         _metrics(report.metrics),
+        _intervals(report.intervals),
         _funnel(report.funnel),
         _agreement(report),
         _taps(report),

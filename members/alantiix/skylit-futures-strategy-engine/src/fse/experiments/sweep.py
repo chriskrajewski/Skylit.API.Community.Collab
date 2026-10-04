@@ -27,7 +27,10 @@ changed (Req 20.7):
   base threshold; the base threshold for a mode without an R multiple.
 
 The copies go through ``model_copy``, so nothing else is re-parsed or
-re-defaulted. :func:`run_sweep` runs them through
+re-defaulted. ``gates.min_reward_risk.alert_min`` stays at its base value
+(Req 20.7 keeps every other parameter unchanged), so a threshold below it
+gives a copy the schema's ``alert_min <= min`` check would reject; such a
+copy grades no Setup Alert_2R, as a failing value is below both. :func:`run_sweep` runs them through
 :func:`fse.experiments.runner.run_experiment` (same sessions, data range,
 cost settings and seed; Holdout_Period excluded), with the sweep's ranking
 objective and bootstrap resample count, and writes ``frontier.json``

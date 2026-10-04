@@ -84,7 +84,12 @@ agreement with Skylit's ``nodeType`` labels (Req 6.22-6.23)
 from every calendar session the Data_Cache holds full data for (a Snapshot
 for each configured symbol and metric, 1-minute bars for each instrument), at
 ``experiments.holdout_fraction`` (Req 22.1), so the report can say whether
-the run includes a Holdout_Period session (Req 20.15).
+the run includes a Holdout_Period session (Req 20.15). After the last
+session, the 95% percentile bootstrap intervals of the Primary_Win_Rate and
+expectancy in R (:func:`fse.analytics.bootstrap.bootstrap_intervals`) are
+drawn from the accepted trades with the run's seed and
+``reporting.bootstrap_resamples``; the Run_Manifest records the seed and
+resample count, and ``report_inputs.json`` the bounds (Req 20.12).
 
 **Monte Carlo inputs.** Each evaluated session gets a :class:`SessionOutcome`:
 the trading day's net P&L, its intraday equity low (the lowest day P&L plus
@@ -122,7 +127,10 @@ from decimal import Decimal
 from pathlib import Path
 from typing import ClassVar, Final, Literal
 
+from fse.analytics.bootstrap import BootstrapIntervals, bootstrap_intervals
+from fse.analytics.frontier import interval_to_jsonable
 from fse.analytics.funnel import GateFunnel, funnel_to_jsonable, gate_funnel
+from fse.analytics.metrics import MetricsCfg
 from fse.backtest.decision_log import DECISION_LOG_FILE_NAME, DecisionLog, map_key
 from fse.backtest.manifest import (
     MANIFEST_FILE_NAME,
@@ -200,6 +208,8 @@ __all__ = [
     "check_sessions",
     "default_run_id",
     "has_first_target",
+    "intervals_to_jsonable",
+    "metrics_cfg",
     "offline_gap_lines",
     "resolve_seed",
     "run_backtest",
@@ -545,6 +555,7 @@ class BacktestResult:
     tap_counts: tuple[TapCounts, ...]
     agreement: NodeAgreement
     holdout: HoldoutPeriod | None
+    intervals: BootstrapIntervals
 
 
 # ---------------------------------------------------------------- the trade list
@@ -1099,7 +1110,14 @@ def run_backtest(
             min_sample=cfg.reporting.shadow_min_sample,
             sessions=evaluated,
         )
-        inputs = _report_inputs(cfg, instruments, enabled, holdout, evaluated, loop)
+        intervals = bootstrap_intervals(
+            trades,
+            metrics_cfg(cfg),
+            seed=resolved_seed,
+            resamples=cfg.reporting.bootstrap_resamples,
+        )
+        rec.record_bootstrap(intervals)
+        inputs = _report_inputs(cfg, instruments, enabled, holdout, evaluated, loop, intervals)
         rec.output(writer.write_text(run_dir / TRADES_CSV_FILE_NAME, trades_csv(trades)))
         rec.output(writer.write_json(run_dir / TRADES_JSON_FILE_NAME, to_jsonable(list(trades))))
         rec.output(writer.write_json(run_dir / ATTEMPTS_FILE_NAME, to_jsonable(list(attempts))))
@@ -1128,6 +1146,7 @@ def run_backtest(
         tap_counts=tuple(loop.tap_counts),
         agreement=loop.agreement,
         holdout=holdout,
+        intervals=intervals,
     )
 
 
@@ -1181,6 +1200,35 @@ def has_first_target(cfg: StrategyConfig) -> bool:
     return modes != {"trailing"}
 
 
+def metrics_cfg(cfg: StrategyConfig) -> MetricsCfg:
+    """The :class:`MetricsCfg` of ``cfg``'s ``reporting`` section and Exit_Mode."""
+    rep = cfg.reporting
+    return MetricsCfg(
+        scratch_tolerance_r=Decimal(repr(rep.scratch_tolerance_r)),
+        min_sample_trades=rep.min_sample_trades,
+        primary_win_rate=rep.primary_win_rate,
+        has_first_target=has_first_target(cfg),
+    )
+
+
+def intervals_to_jsonable(intervals: BootstrapIntervals) -> JsonValue:
+    """A run's bootstrap intervals as ``report_inputs.json`` stores them (Req 20.12-20.13).
+
+    Each bound is the ``repr`` of its float64 value, so it reads back exactly;
+    an undefined interval is ``"not applicable"`` (Req 20.16).
+    """
+    return {
+        "confidence_pct": intervals.confidence_pct,
+        "seed": intervals.seed,
+        "resamples": intervals.resamples,
+        "trade_count": intervals.trade_count,
+        "low_sample": intervals.low_sample,
+        "primary_win_rate": intervals.primary_win_rate,
+        "primary_win_rate_pct": interval_to_jsonable(intervals.primary_win_rate_pct),
+        "expectancy_r": interval_to_jsonable(intervals.expectancy_r),
+    }
+
+
 def _report_inputs(
     cfg: StrategyConfig,
     instruments: Sequence[str],
@@ -1188,6 +1236,7 @@ def _report_inputs(
     holdout: HoldoutPeriod | None,
     evaluated: Sequence[date],
     loop: _Loop,
+    intervals: BootstrapIntervals,
 ) -> JsonValue:
     """What ``fse report`` reads besides the trades and the Gate_Funnel (Req 20.15, 18.11)."""
     costs: dict[str, object] = {}
@@ -1206,6 +1255,7 @@ def _report_inputs(
         }
     rep = cfg.reporting
     a = loop.agreement
+    bootstrap: object = intervals_to_jsonable(intervals)
     return to_jsonable(
         {
             "decision_cadence_s": cfg.time.decision_cadence_s,
@@ -1225,6 +1275,7 @@ def _report_inputs(
             "shadow_min_sample": rep.shadow_min_sample,
             "enabled_gates": list(enabled),
             "holdout": held,
+            "bootstrap": bootstrap,
             "node_agreement": {
                 "compared": a.compared,
                 "without_labels": a.without_labels,

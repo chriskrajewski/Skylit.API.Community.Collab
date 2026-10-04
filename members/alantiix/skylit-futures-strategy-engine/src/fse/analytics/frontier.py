@@ -211,7 +211,9 @@ def frontier_to_jsonable(
 ) -> dict[str, JsonValue]:
     """``frontier.json``: the rows with Pareto labels, the reference list and the ranking.
 
-    ``ranking`` holds row positions from first-ranked to last.
+    ``ranking`` holds row positions from first-ranked to last. The
+    ``ranking`` entry is ``null`` below two rows, as in ``comparison.json``
+    (Req 20.14 ranks two or more configurations).
     """
     statuses = pareto_statuses([r.pareto_point for r in rows])
     met = reference_rows(rows, reference_win_rate)
@@ -250,7 +252,9 @@ def frontier_to_jsonable(
                 for r in met
             ],
         },
-        "ranking": {
+        "ranking": None
+        if len(rows) < 2
+        else {
             "objective": ranking_objective,
             "order": [rows[i].name for i in ranking],
         },
