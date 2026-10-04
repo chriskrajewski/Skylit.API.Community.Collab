@@ -756,8 +756,8 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
   - Operator: run `fse backtest --config configs/playbook_baseline.yaml --start <first cached session> --end <last session before the Holdout_Period> --offline`, then `fse report --run <run_id>`. If the report header says Holdout_Period sessions are included, rerun with an earlier end date.
   - Operator: read the funnel: status counts, first-failing Gates, only-failing shadow trades, and the per-session top 3 Gates. These show why the bot rarely trades.
 
-- [ ] 24. Monte_Carlo_Simulator
-  - [ ] 24.1 Implement the Combine pass estimate
+- [x] 24. Monte_Carlo_Simulator
+  - [x] 24.1 Implement the Combine pass estimate
     - `src/fse/analytics/montecarlo.py`, per design §21:
       - session outcomes from a completed run
       - vectorized seeded paths with the account rules
@@ -766,15 +766,15 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
       - the `truncated_by_run_account` count and the "insufficient sample" label
     - _Requirements: 21.1, 21.2, 21.3, 21.4, 21.5, 21.6, 21.7, 21.8, 21.9, 21.10, 21.11, 21.12_
 
-  - [ ] 24.2 Write property test for the path model
+  - [x] 24.2 Write property test for the path model
     - **Property 65: Path model matches the scalar reference**
     - **Validates: Requirements 21.1, 21.2, 21.4, 21.5**
 
-  - [ ] 24.3 Write property test for estimate accounting
+  - [x] 24.3 Write property test for estimate accounting
     - **Property 66: Estimate accounting**
     - **Validates: Requirements 21.6, 21.7, 21.8**
 
-  - [ ] 24.4 Write unit tests for estimate edge cases
+  - [x] 24.4 Write unit tests for estimate edge cases
     - No passing paths, fewer than the minimum sessions, and out-of-range inputs
     - _Requirements: 21.7, 21.11, 21.12_
 
