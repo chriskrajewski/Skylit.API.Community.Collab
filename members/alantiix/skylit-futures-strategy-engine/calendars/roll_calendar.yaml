@@ -1,0 +1,113 @@
+# OPERATOR: PLEASE VERIFY THIS FILE before you rely on any backtest or live run.
+# Check the roll dates against the sources below and against the contract your
+# bar source and broker actually serve. Before each quarter, add the next
+# contract and move `covers.last`.
+#
+# Futures roll calendar (Req 4.5), read by `fse.calendars`. A missing file, an
+# invalid entry, or a run session outside `covers` stops the run before the
+# first Decision_Time with exit code 2 (Req 4.16).
+#
+# Sources (checked 2026-10-03):
+#   CME Group equity index roll dates:
+#     https://www.cmegroup.com/trading/equity-index/rolldates.html
+#   CME Group E-mini S&P 500 and E-mini Nasdaq-100 contract specs (quarterly
+#   March, June, September and December contracts):
+#     https://www.cmegroup.com/markets/equities/sp/e-mini-sandp500.contractSpecs.html
+#     https://www.cmegroup.com/markets/equities/nasdaq/e-mini-nasdaq-100.contractSpecs.html
+#
+# Conventions:
+#   - Each entry assigns one contract to every session from `first` to `last`,
+#     both inclusive. Every bar of a session, including the bars from 18:00 the
+#     evening before, comes from that contract (Req 4.5). A session with no
+#     entry has no contract; the coverage report records it (Req 4.8).
+#   - Roll rule: CME's published equity roll date, the Monday before the third
+#     Friday of the expiration month. From that session on, the next quarterly
+#     contract is used. The 2026 dates (03-16, 06-15, 09-14, 12-14) match CME's
+#     page as quoted by other sites; cmegroup.com refused automated downloads.
+#     The same rule is applied to 2023-2025. Some platforms roll on the
+#     Thursday eight days before expiration instead; compare with your data.
+#   - June 2026: the third Friday (2026-06-19) is the Juneteenth holiday; the
+#     roll date is still Monday 2026-06-15.
+#   - Contract codes use CME Globex single-digit years: ESZ6 is December 2026.
+#   - atlas_symbol and projectx_contract_id are optional and left out, because
+#     they were not known with certainty. Add them once resolved with Atlas
+#     GET /v1/search and the ProjectX contract search, for example:
+#       - {first: 2026-12-14, last: 2026-12-31, contract: ESH7,
+#          atlas_symbol: <Atlas ticker>, projectx_contract_id: <ProjectX id>}
+#     The Live_Runner compares the ProjectX front-month id with this file at
+#     each session start and blocks the instrument on a mismatch (Req 24.11-24.12).
+#   - Dates are YYYY-MM-DD.
+
+covers:
+  first: 2023-03-28
+  last: 2026-12-31
+
+instruments:
+  ES:
+    - {first: 2023-03-28, last: 2023-06-09, contract: ESM3}
+    - {first: 2023-06-12, last: 2023-09-08, contract: ESU3}
+    - {first: 2023-09-11, last: 2023-12-08, contract: ESZ3}
+    - {first: 2023-12-11, last: 2024-03-08, contract: ESH4}
+    - {first: 2024-03-11, last: 2024-06-14, contract: ESM4}
+    - {first: 2024-06-17, last: 2024-09-13, contract: ESU4}
+    - {first: 2024-09-16, last: 2024-12-13, contract: ESZ4}
+    - {first: 2024-12-16, last: 2025-03-14, contract: ESH5}
+    - {first: 2025-03-17, last: 2025-06-13, contract: ESM5}
+    - {first: 2025-06-16, last: 2025-09-12, contract: ESU5}
+    - {first: 2025-09-15, last: 2025-12-12, contract: ESZ5}
+    - {first: 2025-12-15, last: 2026-03-13, contract: ESH6}
+    - {first: 2026-03-16, last: 2026-06-12, contract: ESM6}
+    - {first: 2026-06-15, last: 2026-09-11, contract: ESU6}
+    - {first: 2026-09-14, last: 2026-12-11, contract: ESZ6}
+    - {first: 2026-12-14, last: 2026-12-31, contract: ESH7}
+  NQ:
+    - {first: 2023-03-28, last: 2023-06-09, contract: NQM3}
+    - {first: 2023-06-12, last: 2023-09-08, contract: NQU3}
+    - {first: 2023-09-11, last: 2023-12-08, contract: NQZ3}
+    - {first: 2023-12-11, last: 2024-03-08, contract: NQH4}
+    - {first: 2024-03-11, last: 2024-06-14, contract: NQM4}
+    - {first: 2024-06-17, last: 2024-09-13, contract: NQU4}
+    - {first: 2024-09-16, last: 2024-12-13, contract: NQZ4}
+    - {first: 2024-12-16, last: 2025-03-14, contract: NQH5}
+    - {first: 2025-03-17, last: 2025-06-13, contract: NQM5}
+    - {first: 2025-06-16, last: 2025-09-12, contract: NQU5}
+    - {first: 2025-09-15, last: 2025-12-12, contract: NQZ5}
+    - {first: 2025-12-15, last: 2026-03-13, contract: NQH6}
+    - {first: 2026-03-16, last: 2026-06-12, contract: NQM6}
+    - {first: 2026-06-15, last: 2026-09-11, contract: NQU6}
+    - {first: 2026-09-14, last: 2026-12-11, contract: NQZ6}
+    - {first: 2026-12-14, last: 2026-12-31, contract: NQH7}
+  MES:
+    - {first: 2023-03-28, last: 2023-06-09, contract: MESM3}
+    - {first: 2023-06-12, last: 2023-09-08, contract: MESU3}
+    - {first: 2023-09-11, last: 2023-12-08, contract: MESZ3}
+    - {first: 2023-12-11, last: 2024-03-08, contract: MESH4}
+    - {first: 2024-03-11, last: 2024-06-14, contract: MESM4}
+    - {first: 2024-06-17, last: 2024-09-13, contract: MESU4}
+    - {first: 2024-09-16, last: 2024-12-13, contract: MESZ4}
+    - {first: 2024-12-16, last: 2025-03-14, contract: MESH5}
+    - {first: 2025-03-17, last: 2025-06-13, contract: MESM5}
+    - {first: 2025-06-16, last: 2025-09-12, contract: MESU5}
+    - {first: 2025-09-15, last: 2025-12-12, contract: MESZ5}
+    - {first: 2025-12-15, last: 2026-03-13, contract: MESH6}
+    - {first: 2026-03-16, last: 2026-06-12, contract: MESM6}
+    - {first: 2026-06-15, last: 2026-09-11, contract: MESU6}
+    - {first: 2026-09-14, last: 2026-12-11, contract: MESZ6}
+    - {first: 2026-12-14, last: 2026-12-31, contract: MESH7}
+  MNQ:
+    - {first: 2023-03-28, last: 2023-06-09, contract: MNQM3}
+    - {first: 2023-06-12, last: 2023-09-08, contract: MNQU3}
+    - {first: 2023-09-11, last: 2023-12-08, contract: MNQZ3}
+    - {first: 2023-12-11, last: 2024-03-08, contract: MNQH4}
+    - {first: 2024-03-11, last: 2024-06-14, contract: MNQM4}
+    - {first: 2024-06-17, last: 2024-09-13, contract: MNQU4}
+    - {first: 2024-09-16, last: 2024-12-13, contract: MNQZ4}
+    - {first: 2024-12-16, last: 2025-03-14, contract: MNQH5}
+    - {first: 2025-03-17, last: 2025-06-13, contract: MNQM5}
+    - {first: 2025-06-16, last: 2025-09-12, contract: MNQU5}
+    - {first: 2025-09-15, last: 2025-12-12, contract: MNQZ5}
+    - {first: 2025-12-15, last: 2026-03-13, contract: MNQH6}
+    - {first: 2026-03-16, last: 2026-06-12, contract: MNQM6}
+    - {first: 2026-06-15, last: 2026-09-11, contract: MNQU6}
+    - {first: 2026-09-14, last: 2026-12-11, contract: MNQZ6}
+    - {first: 2026-12-14, last: 2026-12-31, contract: MNQH7}

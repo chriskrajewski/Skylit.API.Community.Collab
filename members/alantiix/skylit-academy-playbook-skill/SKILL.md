@@ -104,7 +104,7 @@ Never trade the midpoint.
 
 ## Node lifecycle
 
-Fresh ? tested ? delivered ? decaying.
+Fresh → tested → delivered → decaying.
 
 King / major-node **reaction** (Academy): 1st ~80% full size, 2nd ~66% size down, 3rd ~33% small or pass, 4th spent.
 
@@ -141,7 +141,7 @@ FOMO pass: if price has already traveled more than 60% of the expected 3R, do no
 
 1. ES/NQ chart structure names the location (hourly, then 3m trigger).
 2. Heatseeker: **live** high-magnitude node at that converted level (the asOf at the tap, not the open print). King or empty-basement floor beats a thin twice-tapped Gatekeeper.
-3. Tap entry, correct stop, ?3:1, regime-matched, commandment 9-10.
+3. Tap entry, correct stop, ≥3:1, regime-matched, commandment 9-10.
 
 Missing one = B or pass. Full Trinity = full size. 2 of 3 = size down. Divergence = wait. SPX as the outlier is more serious than QQQ lagging, except Empty Basement: QQQ/SPY floor can overrule an SPX lower magnet.
 
@@ -151,4 +151,4 @@ No chart thesis. Midpoints. Sloppy Seconds. Fading a 3rd Gatekeeper test. Fading
 
 ## How to speak a read
 
-Chart thesis (ES/NQ) ? converted node ? King / floor / ceiling ? GEX vs VEX control ? Trinity ? tap count ? A+ or pass. Cite `asOf`. Do not dump every strike. Never present a Heatseeker print as an order.
+Chart thesis (ES/NQ) → converted node → King / floor / ceiling → GEX vs VEX control → Trinity → tap count → A+ or pass. Cite `asOf`. Do not dump every strike. Never present a Heatseeker print as an order.

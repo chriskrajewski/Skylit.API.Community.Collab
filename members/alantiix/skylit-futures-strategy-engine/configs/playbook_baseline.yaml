@@ -1,0 +1,145 @@
+# Playbook_Baseline (Req 17.9): the Skill_Document rules as written, including the
+# rules that conflict (design "Playbook_Baseline choices that codify the Skill_Documents").
+# It takes no position on whether any rule has edge.
+#
+# - Paper Order_Mode: the in-process Paper_Broker; no broker order is ever sent.
+# - Every value of the design's codification table is written out, even where it equals
+#   the schema default. Keys not written here take their Config_Schema default
+#   (src/fse/config/schema/).
+# - "OPERATOR: required" marks a value the Skill_Documents do not settle. It has no
+#   default, so the Config_Loader rejects this file until the Operator enters it.
+# - Never put an account name, account id or credential in this file (Req 17.5).
+# - docs/traceability.md maps each Skill_Document rule to its key path and value here.
+#
+# Sources, relative to members/alantiix/skylit-academy-playbook-skill/:
+#   SKILL = SKILL.md
+#   CW    = skill-fine-tune-wip/current_working_SKILL_100226.md
+#   TASK  = skill-fine-tune-wip/TASK.md
+
+schema_version: 1
+config_id: playbook_baseline
+order_mode: paper # paper | practice | combine (Req 17.2)
+
+data:
+  instruments: # "default 5 MES / 3 MNQ" (SKILL, Execution); fills.costs needs both
+    es_levels: MES
+    nq_levels: MNQ
+
+# OPERATOR: required: regime.min_abs_value, a number above 0 with no default (Req 7.4).
+# Run `fse calibrate regime-min-abs --start <date> --end <date> --percentile <P>`, write
+# the chosen value as `regime: {min_abs_value: <value>}` and record its derivation in
+# docs/traceability.md.
+regime: {}
+
+gates:
+  stale_map: {enabled: true} # live map hard rule (SKILL, Live map)
+  map_grade: {enabled: true} # "F map / ambiguous map" (SKILL, Hard passes)
+  midpoint: {enabled: true} # "Never trade the midpoint" (SKILL, Session map)
+  deflection_band: {enabled: true} # enter inside the deflection band (SKILL, Execution)
+  chart_confluence: {enabled: true} # charts first, A+ #1 (SKILL, A+)
+  # Confluence layers, not hard passes (TASK, "CONFLUENCE LAYERS"). Off, but still
+  # measured and recorded `disabled`, so the funnel and ablation can test them.
+  stdev_fib_zone: {enabled: false} # std-dev fib recipe (TASK)
+  dark_pool_confluence: {enabled: false} # Flowseeker dark pool, "Confluence only" (TASK)
+  trinity_agreement: {enabled: true} # Trinity divergence, Empty Basement exception (SKILL, Hard passes)
+  candle_color: {enabled: true} # commandment 9 (SKILL, Ten Commandments)
+  tap_count: {enabled: true} # King reaction, 3rd = pass (SKILL, Node lifecycle)
+  third_gatekeeper_test: {enabled: true} # "Fading a 3rd Gatekeeper test" (SKILL, Hard passes)
+  weekly_node_tests: {enabled: true} # "Same node, max two tests per week" (CW, Bootcamp 5-10)
+  sloppy_seconds: {enabled: true} # "Sloppy Seconds" (SKILL, Hard passes)
+  air_pocket_fade: {enabled: true} # "Fading inside an air pocket" (SKILL, Hard passes)
+  min_reward_risk: # "50K house minimum 3:1 or pass" (CW, Execution)
+    enabled: true
+    min: 3.0
+    alert_min: 2.0 # 2:1 alerts, ping only (TASK, "2:1 ALERTS")
+  opposition_inside_target: # "Opposition inside 3R" (SKILL, Hard passes)
+    enabled: true
+    fraction: 0.85
+    window_r: 3.0
+  fomo_travel: {enabled: true} # FOMO pass at 60% (SKILL, Execution)
+  open_shuffle: {enabled: true} # "The first 15-30 min shuffle" (CW, Bootcamp 5-10)
+  entry_cutoff: {enabled: true} # "not 15:25+ new entries" (TASK)
+  late_session_chase: {enabled: true} # "3:30-4:00 chase" (SKILL, Hard passes)
+  news_window: {enabled: true} # "News/black-swan window" (SKILL, Hard passes)
+  vix_gap: {enabled: true} # "VIX 15-20% gap until the map settles" (SKILL, Hard passes)
+  regime_match: # regime playbook (SKILL, Regime); allowed sets from design §11
+    enabled: true
+    allowed:
+      gatekeeper_fade: [Positive_Gamma, Whipsaw]
+      floor_ceiling_bounce: [Positive_Gamma, Whipsaw]
+      floor_ceiling_bounce_empty_basement: [Positive_Gamma, Whipsaw]
+      beach_ball: [Positive_Gamma, Whipsaw]
+      rug: [Positive_Gamma, Negative_Gamma]
+      reverse_rug: [Positive_Gamma, Negative_Gamma]
+      whipsaw_fade: [Whipsaw]
+      trend_follow: [Negative_Gamma, Vanna_Dominant]
+  dormant_node: {enabled: true} # far-OTM dormant (SKILL, Node lifecycle)
+  gatekeepers_on_path: {enabled: true} # multiple Gatekeepers kill the target (SKILL, Node lifecycle)
+  node_growth_divergence: {enabled: true} # floor should shrink after bounce (SKILL, Patterns)
+  kill_switch_lockout: {enabled: true} # "Kill-switch lockout" (SKILL, Hard passes)
+
+exits:
+  global: # "Flatten at 3R or at the next opposition node, whichever comes first" (CW, Bootcamp 5-10)
+    mode: opposition_or_fixed_r
+    stop_rule: one_node_beyond # "Stops: one node beyond invalidation" (SKILL, Execution)
+  per_regime:
+    Positive_Gamma: # "+GEX: fade, wider stop, tighter target (next node)" (SKILL, Regime)
+      mode: next_node
+      stop_rule: one_node_beyond
+  modes:
+    next_node: {enabled: true}
+    opposition_or_fixed_r:
+      enabled: true
+      r_multiple: 3.0 # the 3R of "Flatten at 3R" (CW, Bootcamp 5-10)
+  breakeven: # "BE once working ~TP1 or clean hold" (TASK); approximate, see docs/traceability.md
+    enabled: true
+    trigger_r: 1.0
+
+orders:
+  flatten_time: "15:55" # "flatten 15:55" (TASK; CW, Bootcamp 5-10)
+  max_open: 1 # "Only one armed A+ limit at a time" (TASK)
+  # "Cancel the resting limit if king flips, BoS/stdev leg invalidates, equal-pull
+  # opposition enters 3R" (TASK); node gone or polarity flipped (SKILL, Live map).
+  cancel_triggers:
+    king_flip: true
+    source_node_gone: true
+    sign_flip: true
+    stdev_leg_dropped: true
+    opposition_in_target: true
+  invalidation: # backtest refresh invalidation, "treat it as scratched" (SKILL, Live map)
+    king_flip: exit_market
+    source_node_gone: exit_market
+    sign_flip: exit_market
+
+fills:
+  # OPERATOR: required: fills.costs.<instrument>.commission and .exchange_fee for each
+  # traded instrument, quoted dollars per contract per side from "0.00" to "25.00", with
+  # no default (Req 13.8). Enter the current Topstep values, as
+  # `MES: {commission: "<usd>", exchange_fee: "<usd>"}`.
+  costs:
+    MES: {} # OPERATOR: required: commission, exchange_fee
+    MNQ: {} # OPERATOR: required: commission, exchange_fee
+
+sizing:
+  mode: fixed_contracts # "default 5 MES / 3 MNQ (~$375 risk)" (SKILL, Execution)
+  fixed: {MES: 5, MNQ: 3}
+  risk_usd: "375"
+  # "After a big win day (hit the ~$1,200 cap or a full 3R): next session starts at
+  # 50% size (3 MES / 2 MNQ)" (CW, Bootcamp kill switches)
+  big_win:
+    usd: "1200"
+    r: 3.0
+    reduced: {MES: 3, MNQ: 2}
+  # "2 of 3 = size down" (SKILL, A+); the rule gives no amount, 0.5 is the Req 14.6 default
+  trinity_size_down: {enabled: true, fraction: 0.5}
+  vix_gap: {enabled: true, pct: 15.0} # "VIX gap of 15-20% ...: half size" (CW, Bootcamp 5-10)
+  micro_equivalent_limit: 50 # Req 14.4 default; no Skill_Document source
+
+kill_switches: # CW, Bootcamp kill switches (50K copilot)
+  max_trades: {enabled: true, max: 3} # "Max 1-3 trades/day. After 3, done"
+  max_losers: {enabled: true, limit: 2} # "2 losers on the day: lockout"
+  consecutive_losers: {enabled: true, limit: 3} # "3 losers in a row: ... next session off"
+  red_day: {enabled: true, threshold_usd: "0"} # "Red day rule: ... Flatten and stop."
+  daily_profit_cap: {enabled: true, cap_usd: "1200"} # "Day cap ~$1,200" (TASK)
+  internal_daily_loss_stop: {enabled: false, multiple: 2.0} # not a Skill_Document rule (Req 16.6)
+  losing_trade_tolerance_usd: "0" # a Losing_Trade nets below $0 (Glossary)

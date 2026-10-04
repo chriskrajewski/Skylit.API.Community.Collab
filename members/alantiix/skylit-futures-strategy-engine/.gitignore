@@ -1,0 +1,11 @@
+# Local secrets. Copy .env.example to .env; never commit .env.
+.env
+
+# Default output directory names. Outputs default to ~/.skylit-fse/, outside the
+# repository. These entries cover outputs the Operator points inside this folder,
+# since they hold Skylit Snapshot values, bars or dark-pool prints.
+cache/
+runs/
+recordings/
+live-state/
+logs/

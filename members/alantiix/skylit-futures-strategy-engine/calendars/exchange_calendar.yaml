@@ -1,0 +1,98 @@
+# OPERATOR: PLEASE VERIFY THIS FILE before you rely on any backtest or live run.
+# Check every date and time below against the sources listed here. When the
+# exchanges publish a new year, add its entries and move `covers.last`.
+#
+# Exchange holidays and early closes (Req 4.15), read by `fse.calendars`.
+# A missing file, an invalid entry, or a run session outside `covers` stops the
+# run before the first Decision_Time with exit code 2 (Req 4.16).
+#
+# Sources (checked 2026-10-03):
+#   CME Group holiday calendar:
+#     https://www.cmegroup.com/tools-information/holiday-calendar.html
+#   CME Group holiday files, for example
+#     https://www.cmegroup.com/tools-information/holiday-calendar/files/2026/christmas-holiday-settlement-times-2026.pdf
+#     https://www.cmegroup.com/tools-information/holiday-calendar/files/2026/good-friday-holiday-settlement-times-2026.pdf
+#   CME Group National Day of Mourning hours (2025-01-09):
+#     https://www.cmegroup.com/media-room/press-releases/2025/12/30/cme_group_announcestradinghoursforusnationaldayofmourningtohonor.html
+#   NYSE holidays and trading hours:
+#     https://www.nyse.com/markets/hours-calendars
+#
+# Conventions:
+#   - A session is one RTH date, 09:30-16:00 America/New_York. The Skylit
+#     heatmaps come from SPX, SPY and QQQ options, so a session needs the stock
+#     and options markets open.
+#   - holidays: weekdays with no RTH session. CME Globex equity index futures
+#     still trade a shortened session on most of these days (and on Good Friday
+#     2023-04-07 and 2026-04-03 for the jobs report), but the stock and options
+#     markets are closed, so they are not sessions here. List the weekday that
+#     is observed, never a weekend date.
+#   - early_closes: sessions that end early. `time` is the New York close used
+#     for the Pull_Window end, the RTH bar range, Flatten_Time and Flat_Deadline.
+#     13:15 is the CME Globex equity index futures early halt (12:15 CT), which
+#     is also the early close for eligible options. NYSE stocks close at 13:00
+#     on these days; use "13:00" instead if you want the cash close.
+#   - Dates are YYYY-MM-DD. Times are HH:MM, 24-hour, America/New_York, quoted.
+
+covers:
+  first: 2023-03-28
+  last: 2026-12-31
+
+holidays:
+  # 2023 (from 2023-03-28)
+  - {date: 2023-04-07, name: Good Friday}
+  - {date: 2023-05-29, name: Memorial Day}
+  - {date: 2023-06-19, name: Juneteenth}
+  - {date: 2023-07-04, name: Independence Day}
+  - {date: 2023-09-04, name: Labor Day}
+  - {date: 2023-11-23, name: Thanksgiving Day}
+  - {date: 2023-12-25, name: Christmas Day}
+  # 2024
+  - {date: 2024-01-01, name: New Year's Day}
+  - {date: 2024-01-15, name: Martin Luther King Jr. Day}
+  - {date: 2024-02-19, name: Washington's Birthday}
+  - {date: 2024-03-29, name: Good Friday}
+  - {date: 2024-05-27, name: Memorial Day}
+  - {date: 2024-06-19, name: Juneteenth}
+  - {date: 2024-07-04, name: Independence Day}
+  - {date: 2024-09-02, name: Labor Day}
+  - {date: 2024-11-28, name: Thanksgiving Day}
+  - {date: 2024-12-25, name: Christmas Day}
+  # 2025
+  - {date: 2025-01-01, name: New Year's Day}
+  - {date: 2025-01-09, name: National Day of Mourning for President Jimmy Carter}
+  - {date: 2025-01-20, name: Martin Luther King Jr. Day}
+  - {date: 2025-02-17, name: Washington's Birthday}
+  - {date: 2025-04-18, name: Good Friday}
+  - {date: 2025-05-26, name: Memorial Day}
+  - {date: 2025-06-19, name: Juneteenth}
+  - {date: 2025-07-04, name: Independence Day}
+  - {date: 2025-09-01, name: Labor Day}
+  - {date: 2025-11-27, name: Thanksgiving Day}
+  - {date: 2025-12-25, name: Christmas Day}
+  # 2026
+  - {date: 2026-01-01, name: New Year's Day}
+  - {date: 2026-01-19, name: Martin Luther King Jr. Day}
+  - {date: 2026-02-16, name: Washington's Birthday}
+  - {date: 2026-04-03, name: Good Friday}
+  - {date: 2026-05-25, name: Memorial Day}
+  - {date: 2026-06-19, name: Juneteenth}
+  - {date: 2026-07-03, name: Independence Day (observed)}
+  - {date: 2026-09-07, name: Labor Day}
+  - {date: 2026-11-26, name: Thanksgiving Day}
+  - {date: 2026-12-25, name: Christmas Day}
+
+early_closes:
+  # 2023
+  - {date: 2023-07-03, time: "13:15", name: Day before Independence Day}
+  - {date: 2023-11-24, time: "13:15", name: Day after Thanksgiving}
+  # 2024
+  - {date: 2024-07-03, time: "13:15", name: Day before Independence Day}
+  - {date: 2024-11-29, time: "13:15", name: Day after Thanksgiving}
+  - {date: 2024-12-24, time: "13:15", name: Christmas Eve}
+  # 2025
+  - {date: 2025-07-03, time: "13:15", name: Day before Independence Day}
+  - {date: 2025-11-28, time: "13:15", name: Day after Thanksgiving}
+  - {date: 2025-12-24, time: "13:15", name: Christmas Eve}
+  # 2026 (no early close on 2026-07-02; Independence Day is observed 2026-07-03)
+  - {date: 2026-11-27, time: "13:15", name: Day after Thanksgiving}
+  - {date: 2026-12-24, time: "13:15", name: Christmas Eve}

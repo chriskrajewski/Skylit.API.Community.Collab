@@ -1,0 +1,90 @@
+[build-system]
+requires = ["hatchling==1.32.4"]
+build-backend = "hatchling.build"
+
+[project]
+name = "skylit-futures-strategy-engine"
+version = "0.1.0"
+description = "Deterministic strategy engine, backtester and paper runner for the Skylit futures playbook."
+requires-python = ">=3.14"
+# Runtime pins: exact versions from the design. requirements.lock holds the hashes.
+dependencies = [
+    "httpx==0.28.1",
+    "httpx-sse==0.4.3",
+    "pydantic==2.13.5",
+    "pyarrow==25.0.1",
+    "numpy==2.5.3",
+    "PyYAML==6.0.3",
+    "python-dotenv==1.2.4",
+    "tzdata==2026.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.1.1",
+    "hypothesis==6.168.3",
+    "respx==0.23.1",
+    "pytest-asyncio==1.4.0",
+    "ruff==0.16.10",
+    "mypy==2.4.0",
+]
+
+[project.scripts]
+fse = "fse.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fse"]
+
+# ---------------------------------------------------------------- pytest
+
+[tool.pytest.ini_options]
+minversion = "9.0"
+testpaths = ["tests"]
+# perf and live tests run only when asked for: `python -m pytest -m perf`, `-m live`.
+addopts = ["-ra", "--strict-markers", "--strict-config", "-m", "not perf and not live"]
+xfail_strict = true
+markers = [
+    "perf: performance budget tests, run manually on the Operator machine with `-m perf`",
+    "integration: end-to-end tests across components; every HTTP call is mocked by respx",
+    "live: opt-in smoke tests against the real Skylit API (free endpoints only), run with `-m live`",
+]
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"
+asyncio_default_test_loop_scope = "function"
+
+# ---------------------------------------------------------------- ruff
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+    "SIM", # flake8-simplify
+    "PT",  # flake8-pytest-style
+    "RUF", # ruff-specific rules
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["fse"]
+
+# ---------------------------------------------------------------- mypy
+
+[tool.mypy]
+python_version = "3.14"
+mypy_path = "src"
+strict = true
+warn_unreachable = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+# Neither ships type information and no stub package is pinned.
+module = ["pyarrow", "pyarrow.*", "yaml", "yaml.*"]
+ignore_missing_imports = true
