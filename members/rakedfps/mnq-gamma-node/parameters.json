@@ -1,0 +1,70 @@
+{
+  "name": "MNQ gamma-node",
+  "author": "rakedfps",
+  "version": "v3",
+  "updated": "2026-10-03",
+  "instrument": "MNQ",
+  "point_value_usd": 2,
+  "session": {
+    "timezone": "America/New_York",
+    "open": "09:30",
+    "entry_cutoff": "15:55",
+    "eod_flat": "15:55"
+  },
+  "boards": {
+    "price_path": "QQQ 1-second spot, converted to NQ points with the live NDX/QQQ ratio",
+    "setup_symbols": ["QQQ", "NDXP"],
+    "confluence_symbols": ["SPY", "SPXW"],
+    "expirations": "0DTE",
+    "max_strikes": 40,
+    "board_sample": "first board of each minute; the setup is formed from the previous minute"
+  },
+  "entry": {
+    "entry_a": false,
+    "entry_b": true,
+    "b_independent": true,
+    "reclaim_candle_min": 3,
+    "reclaim_window_min": 15
+  },
+  "parameters": {
+    "STRONG": 0.5,
+    "SIG": 0.1,
+    "STOP_PAD_NQ": 1.0,
+    "TARGET_FRONT_NQ": 1.0,
+    "MAX_STOP_NQ": 50,
+    "MIN_RR": 3.0,
+    "RISK_USD": 100,
+    "TICK_NQ": 0.25,
+    "MATCH_NQ": 6.0,
+    "MES_TOL": 0.001,
+    "REARM_R": 0.5,
+    "RECLAIM_WINDOW_MIN": 15,
+    "EOD": "15:55",
+    "DAILY_MAX_TRADES": 3,
+    "DAILY_STOP_USD": -250,
+    "TIGHT_STOP": true,
+    "TIGHT_MIN_PCT": 0.8,
+    "TIGHT_STOP_NQ": 5.0,
+    "VELOCITY_MODE": "both",
+    "ENTRY_CUTOFF": "15:55",
+    "ENTRY_A": false,
+    "B_INDEPENDENT": true,
+    "B_MIN_STOP_FROM_NODE_NQ": 5.0,
+    "MAX_APPROACH_NQ": 40,
+    "APPROACH_WINDOW_MIN": 5,
+    "DEAD_NODE_LOSSES": 2
+  },
+  "sizing": {
+    "contracts": "floor(RISK_USD / (stop_points * point_value_usd))",
+    "qqq_net_gamma_negative": "half",
+    "mes_confluence": "half",
+    "stacking": "The journal states each condition as its own half-size cut and does not say they compound. Apply one half-size cut when either is true."
+  },
+  "rules": {
+    "r1_king_not_behind": "skip",
+    "r2_fast_approach": "skip",
+    "r3_node_dead_after_two_losses": "skip_until_map_moves_the_node",
+    "r4_qqq_net_gamma_positive": "full_size",
+    "r4_qqq_net_gamma_negative": "half_size"
+  }
+}
