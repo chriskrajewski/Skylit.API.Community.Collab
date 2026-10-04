@@ -255,6 +255,22 @@
     "25.2 Write property test for ablation variants": {
       "status": "passed",
       "lastRunTimestamp": 1791135599409
+    },
+    "26.3 Write property test for frontier sweep generation": {
+      "status": "passed",
+      "lastRunTimestamp": 1791138662287
+    },
+    "26.4 Write property test for the Pareto set": {
+      "status": "passed",
+      "lastRunTimestamp": 1791138662287
+    },
+    "26.5 Write property test for ranking and the reference list": {
+      "status": "passed",
+      "lastRunTimestamp": 1791138662287
+    },
+    "26.6 Write property test for seeded analytics determinism": {
+      "status": "passed",
+      "lastRunTimestamp": 1791138662287
     }
   },
   "executionHistory": {

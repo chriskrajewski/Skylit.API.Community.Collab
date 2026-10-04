@@ -793,12 +793,12 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
     - **Property 59: Ablation variants**
     - **Validates: Requirements 19.13, 19.14, 19.15, 19.16**
 
-- [ ] 26. Bootstrap, frontier sweep and ranking
+- [x] 26. Bootstrap, frontier sweep and ranking
   - [x] 26.1 Implement bootstrap confidence intervals
     - `src/fse/analytics/bootstrap.py`: 95% percentile intervals for Primary_Win_Rate and expectancy, from a seeded PCG64 with 1,000 to 100,000 resamples. Record the seed in the Run_Manifest
     - _Requirements: 20.12_
 
-  - [ ] 26.2 Implement the frontier sweep, Pareto set and ranking
+  - [x] 26.2 Implement the frontier sweep, Pareto set and ranking
     - `src/fse/experiments/sweep.py`, `src/fse/experiments/ranking.py` and `src/fse/analytics/frontier.py`:
       - sweep validation and configuration generation
       - the frontier table rows
@@ -806,19 +806,19 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
       - ranking with the tie rules
     - _Requirements: 20.7, 20.8, 20.9, 20.10, 20.11, 20.14_
 
-  - [ ] 26.3 Write property test for frontier sweep generation
+  - [x] 26.3 Write property test for frontier sweep generation
     - **Property 61: Frontier sweep generation**
     - **Validates: Requirements 20.7, 20.8**
 
-  - [ ] 26.4 Write property test for the Pareto set
+  - [x] 26.4 Write property test for the Pareto set
     - **Property 62: Pareto set**
     - **Validates: Requirements 20.10**
 
-  - [ ] 26.5 Write property test for ranking and the reference list
+  - [x] 26.5 Write property test for ranking and the reference list
     - **Property 63: Ranking and reference list**
     - **Validates: Requirements 20.11, 20.13, 20.14**
 
-  - [ ] 26.6 Write property test for seeded analytics determinism
+  - [x] 26.6 Write property test for seeded analytics determinism
     - **Property 64: Seeded analytics determinism**
     - **Validates: Requirements 20.12, 21.9**
 

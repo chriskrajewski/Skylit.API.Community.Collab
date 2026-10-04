@@ -13,9 +13,10 @@ window) goes through :func:`run_experiment`:
 2. **Same sessions and seed** (Req 19.15). Every configuration runs on that
    one session range with one seed, used for the backtest and for the
    Monte_Carlo_Simulator. A seed is drawn when none is given and recorded in
-   the Run_Manifest. A completed configuration that evaluated another list of
-   sessions than the first completed one (in definition order) is marked
-   failed, so every compared figure covers the same session dates.
+   the Run_Manifest. The reference session list is the one most completed
+   configurations evaluated (ties: the first in definition order). A completed
+   configuration that evaluated another list is marked failed, so every
+   compared figure covers the same session dates.
 3. **Workers.** With ``workers`` above 1 the configurations run in a process
    pool; results are merged in definition order whatever order they finish in.
 4. **Failures** (Req 19.16). Any error in one configuration marks it failed
@@ -25,6 +26,14 @@ window) goes through :func:`run_experiment`:
    base config (Shadow_Trades never count) is labeled "insufficient sample".
    The result gives the number of distinct configurations (distinct config
    hashes) evaluated, labeled ones and failed ones included.
+6. **Ranking** (Req 20.14). With two or more configurations the result ranks
+   them by ``ranking_objective`` (default: the base config's
+   ``experiments.ranking_objective``) with the tie rules of
+   :mod:`fse.experiments.ranking`.
+7. **Bootstrap** (Req 20.12). With ``bootstrap_resamples`` set, every
+   completed configuration also gets 95% percentile bootstrap intervals,
+   drawn with the experiment seed; the Run_Manifest records the seed and
+   resample count.
 
 Outputs, through the Log_Writer, in the experiment directory: each
 configuration's backtest and pass-estimate run under
@@ -48,6 +57,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import ClassVar, Final, Literal
 
+from fse.analytics.bootstrap import BootstrapIntervals, bootstrap_intervals
 from fse.analytics.metrics import Metrics, MetricsCfg, metrics_to_jsonable, summarize
 from fse.analytics.montecarlo import (
     PassEstimate,
@@ -66,9 +76,12 @@ from fse.backtest.runner import cache_holdout, has_first_target, run_backtest
 from fse.calendars import load_calendars
 from fse.config.hashing import config_hash
 from fse.config.schema import StrategyConfig
+from fse.config.schema.bootstrap import BOOTSTRAP_RESAMPLES_MAX, BOOTSTRAP_RESAMPLES_MIN
+from fse.config.schema.experiments import RANKING_OBJECTIVES, RankingObjective
 from fse.data.cache import DataCache
 from fse.data.path_guard import check_output_dir
 from fse.experiments.holdout import HoldoutPeriod
+from fse.experiments.ranking import objective_values, rank
 from fse.logio import LogWriter
 from fse.logio.canonical_json import JsonValue
 from fse.logio.redact import Redactor
@@ -129,7 +142,8 @@ class ExperimentConfig:
 class EvalTask:
     """What one configuration's evaluation gets; picklable for a worker process.
 
-    Every task of one experiment has the same ``data_range`` and ``seed``.
+    Every task of one experiment has the same ``data_range``, ``seed`` and
+    ``bootstrap_resamples`` (``None``: no bootstrap intervals).
     """
 
     index: int
@@ -141,17 +155,22 @@ class EvalTask:
     cache_dir: Path
     calendar_dir: Path
     code_version: str | None
+    bootstrap_resamples: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class ConfigResult:
-    """A completed configuration: its sessions, metrics and pass estimate."""
+    """A completed configuration: its sessions, metrics, pass estimate and intervals.
+
+    ``intervals`` is ``None`` when the task asked for no bootstrap intervals.
+    """
 
     run_id: str
     sessions: tuple[date, ...]
     skipped: tuple[SkippedSession, ...]
     metrics: Metrics
     pass_estimate: PassEstimate
+    intervals: BootstrapIntervals | None = None
 
 
 type Evaluator = Callable[[EvalTask, LogWriter], ConfigResult]
@@ -192,6 +211,7 @@ class ExperimentResult:
     seed: int
     holdout: HoldoutPeriod | None
     min_trades: int
+    ranking_objective: RankingObjective
     outcomes: tuple[ConfigOutcome, ...]
 
     @property
@@ -203,6 +223,18 @@ class ExperimentResult:
     def distinct_configurations(self) -> int:
         """Distinct config hashes evaluated, "insufficient sample" and failed ones included."""
         return len({o.config_hash for o in self.outcomes})
+
+    @property
+    def ranking(self) -> tuple[int, ...]:
+        """Outcome positions from first-ranked to last by ``ranking_objective`` (Req 20.14)."""
+        values = [
+            objective_values(
+                None if o.result is None else o.result.metrics,
+                None if o.result is None else o.result.pass_estimate,
+            )
+            for o in self.outcomes
+        ]
+        return rank(values, self.ranking_objective)
 
 
 type OutputBuilder = Callable[[ExperimentResult], Mapping[str, JsonValue]]
@@ -249,7 +281,15 @@ def backtest_evaluator(task: EvalTask, writer: LogWriter) -> ConfigResult:
             code_version=task.code_version,
         )
     sessions = bt.manifest.sessions_evaluated
-    metrics = summarize(bt.trades, sessions, metrics_cfg(task.cfg))
+    mcfg = metrics_cfg(task.cfg)
+    metrics = summarize(bt.trades, sessions, mcfg)
+    intervals = (
+        None
+        if task.bootstrap_resamples is None
+        else bootstrap_intervals(
+            bt.trades, mcfg, seed=task.seed, resamples=task.bootstrap_resamples
+        )
+    )
     mc = run_pass_estimate(
         bt.run_dir,
         task.cfg,
@@ -264,6 +304,7 @@ def backtest_evaluator(task: EvalTask, writer: LogWriter) -> ConfigResult:
         skipped=bt.manifest.sessions_skipped,
         metrics=metrics,
         pass_estimate=mc.estimate,
+        intervals=intervals,
     )
 
 
@@ -307,13 +348,24 @@ def _evaluate_all(
     return out
 
 
+def _reference_sessions(attempts: Sequence[_Attempt]) -> tuple[date, ...] | None:
+    """The session list most completed configurations evaluated; ties: definition order."""
+    counts: dict[tuple[date, ...], int] = {}
+    for a in attempts:
+        if isinstance(a, ConfigResult):
+            counts[a.sessions] = counts.get(a.sessions, 0) + 1
+    if not counts:
+        return None
+    return max(counts, key=lambda s: counts[s])  # max keeps the first of equal counts
+
+
 def _outcomes(
     configs: Sequence[ExperimentConfig],
     hashes: Sequence[str],
     attempts: Sequence[_Attempt],
     min_trades: int,
 ) -> tuple[ConfigOutcome, ...]:
-    reference: tuple[date, ...] | None = None
+    reference = _reference_sessions(attempts)
     out: list[ConfigOutcome] = []
     for i, (c, h, a) in enumerate(zip(configs, hashes, attempts, strict=True)):
         if isinstance(a, ConfigResult) and reference is not None and a.sessions != reference:
@@ -324,8 +376,6 @@ def _outcomes(
         if isinstance(a, str):
             out.append(ConfigOutcome(i, c.name, h, STATUS_FAILED, a, None, False))
             continue
-        if reference is None:
-            reference = a.sessions
         low = a.metrics.trade_count < min_trades
         out.append(ConfigOutcome(i, c.name, h, STATUS_COMPLETED, None, a, low))
     return tuple(out)
@@ -344,6 +394,20 @@ def _check_configs(configs: Sequence[ExperimentConfig]) -> None:
         if c.name in seen:
             raise ExperimentInputError(f"configuration name {c.name!r} is used twice")
         seen.add(c.name)
+
+
+def _check_resamples(resamples: int | None) -> None:
+    if resamples is None:
+        return
+    if (
+        isinstance(resamples, bool)
+        or not isinstance(resamples, int)
+        or not BOOTSTRAP_RESAMPLES_MIN <= resamples <= BOOTSTRAP_RESAMPLES_MAX
+    ):
+        raise ExperimentInputError(
+            f"bootstrap resamples must be a whole number from {BOOTSTRAP_RESAMPLES_MIN:,} to "
+            f"{BOOTSTRAP_RESAMPLES_MAX:,}: {resamples!r}"
+        )
 
 
 def _run_id(kind: str, base_hash: str, hashes: Sequence[str], rng: DataRange, seed: int) -> str:
@@ -371,16 +435,27 @@ def run_experiment(
     base_times: SessionTimes | None = None,
     clock: Callable[[], Instant] = time.time_ns,
     code_version: str | None = None,
+    ranking_objective: RankingObjective | None = None,
+    bootstrap_resamples: int | None = None,
 ) -> ExperimentResult:
     """Run every configuration of ``configs`` on the same sessions and seed (module notes).
 
-    ``base`` sets the Holdout_Period, the "insufficient sample" minimum and
-    the manifest's config hash. Raises :class:`ExperimentInputError` (or
-    ``CalendarError``, ``PathGuardError``) before anything is written.
+    ``base`` sets the Holdout_Period, the "insufficient sample" minimum, the
+    default ranking objective and the manifest's config hash. Raises
+    :class:`ExperimentInputError` (or ``CalendarError``, ``PathGuardError``)
+    before anything is written.
     """
     _check_configs(configs)
     if isinstance(workers, bool) or not isinstance(workers, int) or workers < 1:
         raise ExperimentInputError(f"workers must be a whole number of at least 1: {workers!r}")
+    objective = (
+        base.experiments.ranking_objective if ranking_objective is None else ranking_objective
+    )
+    if objective not in RANKING_OBJECTIVES:
+        raise ExperimentInputError(
+            f"ranking objective {objective!r} is not one of {', '.join(RANKING_OBJECTIVES)}"
+        )
+    _check_resamples(bootstrap_resamples)
     target = check_output_dir(out_dir, label="experiment directory")
     taken = [n for n in (COMPARISON_FILE_NAME, MANIFEST_FILE_NAME) if (target / n).exists()]
     if taken:
@@ -427,6 +502,7 @@ def run_experiment(
                 cache_dir=Path(cache_dir),
                 calendar_dir=Path(calendar_dir),
                 code_version=code_version,
+                bootstrap_resamples=bootstrap_resamples,
             )
             for i, c in enumerate(configs)
         ]
@@ -438,6 +514,11 @@ def run_experiment(
                 rec.evaluated(d)
             for s in reference.skipped:
                 rec.skipped(s.session, s.missing, s.names)
+        drawn = next(
+            (o.result.intervals for o in outcomes if o.result and o.result.intervals), None
+        )
+        if drawn is not None:
+            rec.record_bootstrap(drawn)
         result = ExperimentResult(
             kind=kind,
             run_id=spec.run_id,
@@ -448,6 +529,7 @@ def run_experiment(
             seed=used_seed,
             holdout=holdout,
             min_trades=min_trades,
+            ranking_objective=objective,
             outcomes=outcomes,
         )
         for o in outcomes:
@@ -495,5 +577,16 @@ def comparison_to_jsonable(result: ExperimentResult) -> dict[str, JsonValue]:
         "holdout": None if held is None else held.to_json(),
         "min_trades": result.min_trades,
         "distinct_configurations": result.distinct_configurations,
+        "ranking": _ranking_json(result),
         "configurations": [_outcome_json(o) for o in result.outcomes],
+    }
+
+
+def _ranking_json(result: ExperimentResult) -> JsonValue:
+    """The Req 20.14 ranking by name, or ``null`` for a single configuration."""
+    if len(result.outcomes) < 2:
+        return None
+    return {
+        "objective": result.ranking_objective,
+        "order": [result.outcomes[i].name for i in result.ranking],
     }
