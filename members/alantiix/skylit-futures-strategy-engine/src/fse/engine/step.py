@@ -484,11 +484,17 @@ class DecisionPayload:
 
 @dataclass(frozen=True, slots=True)
 class StepResult:
-    """The next state, the order intents to send at ``t``, and the decision-log payload."""
+    """The next state, the order intents to send at ``t``, and the decision-log payload.
+
+    ``context`` is the Order_Planner's view at ``t`` (Map_State sources, BOS_Legs,
+    last closes, Risk_Manager state); the Backtester's ShadowBook manages its
+    Shadow_Trades with it (design §19).
+    """
 
     state: EngineState
     intents: tuple[OrderIntent, ...]
     payload: DecisionPayload
+    context: PlannerContext
 
 
 @dataclass(frozen=True, slots=True)
@@ -743,7 +749,7 @@ class Engine:
             cards=cards,
         )
         nxt = replace(state, t=t, session=session, lifecycle=m.lifecycle, book=book, cards=memory)
-        return StepResult(nxt, tuple(intents), payload)
+        return StepResult(nxt, tuple(intents), payload, ctx)
 
     # ---------------------------------------------------------------- phases
 

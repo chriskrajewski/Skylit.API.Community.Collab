@@ -67,6 +67,25 @@ Risk_Manager, the Order_Planner and the next step only once that bar has
 closed (Req 5.3): on an early-close day at the first Decision_Time at or after
 the deadline plus 60 s, otherwise at the next session's first Decision_Time.
 
+**Shadow trades and the Gate_Funnel** (design §19). A
+:class:`~fse.backtest.shadow.ShadowBook` gets every bar after the account's
+fills, those fills, and each Decision_Time's payload and planner context in
+the log phase. It simulates the Shadow_Trades of rejected Setup_Keys on its
+own books, closes them at the Flat_Deadline with the account, and gives each
+Setup_Key one final status per session. Nothing it does reaches the engine
+state, the account or the trade list (Req 19.9). The Gate_Funnel
+(:func:`fse.analytics.funnel.gate_funnel`) is computed from those records and
+the accepted trades.
+
+**Report inputs.** Per evaluated session, the Tap count and the inter-decision
+Tap count on the 1-minute bars (Req 18.11), and the King and Gatekeeper
+agreement with Skylit's ``nodeType`` labels (Req 6.22-6.23)
+(:mod:`fse.backtest.stats`). Before the run, the Holdout_Period is computed
+from every calendar session the Data_Cache holds full data for (a Snapshot
+for each configured symbol and metric, 1-minute bars for each instrument), at
+``experiments.holdout_fraction`` (Req 22.1), so the report can say whether
+the run includes a Holdout_Period session (Req 20.15).
+
 **Monte Carlo inputs.** Each evaluated session gets a :class:`SessionOutcome`:
 the trading day's net P&L, its intraday equity low (the lowest day P&L plus
 unrealized P&L at the worst prices, never above 0), and whether the run's own
@@ -74,13 +93,15 @@ Combine_Attempt failed mid-session (design §21).
 
 **Outputs** in the run directory, each through the Log_Writer (Req 1.9):
 ``decision_log.jsonl``, ``trades.csv`` and ``trades.json`` (the trade list,
-MAE and MFE included), ``combine_attempts.json``, ``session_outcomes.json``
-and ``run_manifest.json``.
+MAE and MFE included), ``combine_attempts.json``, ``session_outcomes.json``,
+``setups.json`` (every Setup_Key's final status, with its Shadow_Trade),
+``shadow_trades.csv``, ``gate_funnel.json``, ``report_inputs.json`` and
+``run_manifest.json``.
 
 **Determinism** (Req 18.5). Nothing in the loop reads a clock or draws a
 random number; the manifest clock is injected. Equal inputs and seed give
-byte-identical decision logs, trade lists and manifests, apart from the
-manifest's ``started_at`` and ``ended_at``. A missing seed is drawn with
+byte-identical decision logs, trade lists, Gate_Funnels and manifests, apart
+from the manifest's ``started_at`` and ``ended_at``. A missing seed is drawn with
 ``secrets.randbits(63)`` and recorded (design §21); the seed feeds the seeded
 analytics that read the run.
 """
@@ -101,6 +122,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import ClassVar, Final, Literal
 
+from fse.analytics.funnel import GateFunnel, funnel_to_jsonable, gate_funnel
 from fse.backtest.decision_log import DECISION_LOG_FILE_NAME, DecisionLog, map_key
 from fse.backtest.manifest import (
     MANIFEST_FILE_NAME,
@@ -111,14 +133,18 @@ from fse.backtest.manifest import (
     SkippedSession,
     run_manifest,
 )
+from fse.backtest.shadow import SetupRecord, ShadowBook, ShadowMode
+from fse.backtest.stats import NodeAgreement, TapCounts, node_agreement, tap_counts
 from fse.calendars import load_calendars, project_calendar_dir
 from fse.config.hashing import config_hash
 from fse.config.schema import StrategyConfig
+from fse.config.schema.exits import EXIT_REGIMES
 from fse.data.aux_stores import VixDailyRecord
 from fse.data.cache import CacheWindowKey, DataCache, cache_window_starts
 from fse.data.catalog import BarsCoverageRecord
 from fse.data.medians import MedianParams, RegimeMedianStore
 from fse.data.vix import VIX_INSTRUMENT, VIX_INTERVAL_S, prior_session
+from fse.engine.nodes import NodeParams
 from fse.engine.planner import CancelOrder, ModifyOrder, OrderFill, OrderIntent, PlaceBracket
 from fse.engine.risk import RiskFill
 from fse.engine.state import EngineState
@@ -135,8 +161,9 @@ from fse.engine.types import (
     Ticks,
     Trade,
 )
+from fse.experiments.holdout import HoldoutError, HoldoutPeriod, compute_holdout_period
 from fse.logio import LogWriter
-from fse.logio.canonical_json import dumps, ny_iso, to_jsonable
+from fse.logio.canonical_json import JsonValue, dumps, ny_iso, to_jsonable
 from fse.pit.market_view import MAP_METRICS, HistoricalInputs, HistoricalMarketView, heatmap_view
 from fse.settings import project_dir
 from fse.sim.account import (
@@ -154,7 +181,11 @@ __all__ = [
     "ATTEMPTS_FILE_NAME",
     "BACKTEST_KIND",
     "BACKTEST_OUTPUT_FILES",
+    "FUNNEL_FILE_NAME",
+    "REPORT_INPUTS_FILE_NAME",
     "SESSION_OUTCOMES_FILE_NAME",
+    "SETUPS_FILE_NAME",
+    "SHADOW_TRADES_FILE_NAME",
     "TRADES_CSV_FILE_NAME",
     "TRADES_JSON_FILE_NAME",
     "TRADE_COLUMNS",
@@ -178,12 +209,20 @@ TRADES_CSV_FILE_NAME: Final = "trades.csv"
 TRADES_JSON_FILE_NAME: Final = "trades.json"
 ATTEMPTS_FILE_NAME: Final = "combine_attempts.json"
 SESSION_OUTCOMES_FILE_NAME: Final = "session_outcomes.json"
+SETUPS_FILE_NAME: Final = "setups.json"
+SHADOW_TRADES_FILE_NAME: Final = "shadow_trades.csv"
+FUNNEL_FILE_NAME: Final = "gate_funnel.json"
+REPORT_INPUTS_FILE_NAME: Final = "report_inputs.json"
 BACKTEST_OUTPUT_FILES: Final[tuple[str, ...]] = (
     DECISION_LOG_FILE_NAME,
     TRADES_CSV_FILE_NAME,
     TRADES_JSON_FILE_NAME,
     ATTEMPTS_FILE_NAME,
     SESSION_OUTCOMES_FILE_NAME,
+    SETUPS_FILE_NAME,
+    SHADOW_TRADES_FILE_NAME,
+    FUNNEL_FILE_NAME,
+    REPORT_INPUTS_FILE_NAME,
     MANIFEST_FILE_NAME,
 )
 """Every file a backtest writes in its run directory; none may exist when it starts."""
@@ -362,15 +401,17 @@ class _LoadSpec:
     dark_pool_tickers: tuple[str, ...]
     dark_pool_fetched: Mapping[str, frozenset[date]]
     dark_pool_lookback: int
+    node_params: NodeParams
 
 
 @dataclass(frozen=True, slots=True)
 class _Session:
-    """One session's indexed inputs and its futures bars in open-time order."""
+    """One session's indexed inputs, its futures bars in open-time order and its agreement."""
 
     session: date
     inputs: HistoricalInputs
     bars: tuple[Bar, ...]
+    agreement: NodeAgreement
 
 
 def _lookback_first(calendar: SessionCalendar, session: date, sessions: int) -> date:
@@ -422,7 +463,8 @@ def _load_session(cache: DataCache, check: SessionCheck, spec: _LoadSpec) -> _Se
         dark_pool=dark_pool,
         events=events,
     )
-    return _Session(session, inputs, tuple(bars))
+    agreement = node_agreement(snapshots, spec.node_params)
+    return _Session(session, inputs, tuple(bars), agreement)
 
 
 def _prefetch(
@@ -495,6 +537,12 @@ class BacktestResult:
     outcomes: tuple[SessionOutcome, ...]
     gaps: tuple[WindowGap, ...]
     skipped: tuple[SkippedSession, ...]
+    setups: tuple[SetupRecord, ...]
+    shadow_trades: tuple[Trade, ...]
+    funnel: GateFunnel
+    tap_counts: tuple[TapCounts, ...]
+    agreement: NodeAgreement
+    holdout: HoldoutPeriod | None
 
 
 # ---------------------------------------------------------------- the trade list
@@ -606,6 +654,7 @@ class _Loop:
         account: AccountSim,
         calendar: SessionCalendar,
         log: DecisionLog,
+        shadow_mode: ShadowMode,
     ) -> None:
         self._cfg = cfg
         self._engine = engine
@@ -616,9 +665,12 @@ class _Loop:
         self._cadence_s = cfg.time.decision_cadence_s
         self.state: EngineState = engine.initial_state()
         self.book = SimBook()
+        self.shadows = ShadowBook(cfg.fills, engine.params.planner, cfg.sizing, shadow_mode)
         self.pending: list[StepEvent] = []
         self.trades: list[Trade] = []
         self.outcomes: list[SessionOutcome] = []
+        self.tap_counts: list[TapCounts] = []
+        self.agreement = NodeAgreement()
         self.decision_times = 0
         self._last_bar: dict[str, Bar] = {}
         self._day_low: Money = _ZERO
@@ -634,6 +686,7 @@ class _Loop:
         self._truncated = False
         deadline = cal.flat_deadline(session)
         rth = (cal.rth_open(session), cal.rth_close(session))
+        self.shadows.start_session(session, rth)
         # The closing fills are stamped on the bar that opens at the deadline, so
         # the engine first sees them when that bar has closed (Req 5.3).
         observed = deadline + BASE_INTERVAL_S * NS_PER_SECOND
@@ -662,6 +715,9 @@ class _Loop:
             self._deliver(held)
         net = self._account.day_pnl
         self.outcomes.append(SessionOutcome(session, net, min(self._day_low, net), self._truncated))
+        self.shadows.finish_session(self.state.taps)
+        self.tap_counts.append(tap_counts(self.state.taps, session, cal))
+        self.agreement += data.agreement
 
     def _decide(self, view: HistoricalMarketView, t: Instant) -> None:
         events = tuple(self.pending)
@@ -670,6 +726,7 @@ class _Loop:
         self.state = result.state
         self._route(result.intents)
         self._log.write(result.payload)
+        self.shadows.on_decision(t, result.payload, result.context, self.state.taps)
         self.decision_times += 1
 
     # ------------------------------------------------------------ the bar phase
@@ -685,6 +742,9 @@ class _Loop:
             for event in events:
                 self._account.on_fill(event.fill, event.order)
                 fills.append((bar, event))
+        self.shadows.on_main_fills(event for _, event in fills)
+        for bar in group.bars:
+            self.shadows.on_bar(bar)
         self._day_low = min(self._day_low, self._account.day_pnl + self._unrealized(bars))
         for account_event in self._account.on_bar(bars):
             if isinstance(account_event, Liquidation):
@@ -822,6 +882,7 @@ class _Loop:
             raise ValueError(f"{data.session}: open trades remain after the Flat_Deadline")
         if self.book.orders:
             self._close({}, "flat_deadline", deadline)
+        self.shadows.flat_close(closing, deadline)
         return flat
 
     def _deliver(self, flat: Sequence[tuple[Bar, FillEvent]]) -> None:
@@ -904,6 +965,7 @@ def run_backtest(
     workers: int = 1,
     clock: Callable[[], Instant] = time.time_ns,
     code_version: str | None = None,
+    shadow_mode: ShadowMode = "rejected",
 ) -> BacktestResult:
     """Run ``cfg`` over every session of ``sessions`` from ``cache`` (see the module notes).
 
@@ -917,6 +979,8 @@ def run_backtest(
       section sets the Flat_Deadline.
     - ``workers``: sessions loaded ahead on worker threads (1: none).
     - ``clock`` and ``code_version``: for the Run_Manifest only.
+    - ``shadow_mode``: :class:`~fse.backtest.shadow.ShadowBook` mode; tests
+      only change it.
 
     Raises :class:`BacktestInputError` or :class:`~fse.calendars.CalendarError`
     (exit 2) before any Decision_Time and before any output file. After that,
@@ -990,12 +1054,15 @@ def run_backtest(
             dark_pool_tickers=tickers,
             dark_pool_fetched={t: cache.darkpool.fetched_dates(t) for t in tickers},
             dark_pool_lookback=dp.lookback_sessions,
+            node_params=params.node_params,
         )
+        holdout = _holdout(cfg, cache, calendar, load_spec)
         log_path = run_dir / DECISION_LOG_FILE_NAME
         with DecisionLog(writer, log_path) as log:
             rec.output(log_path)
-            loop = _Loop(cfg, engine, account, calendar, log)
+            loop = _Loop(cfg, engine, account, calendar, log, shadow_mode)
             loaded = _prefetch(cache, [c for c in checks if not c.skip], load_spec, workers)
+            evaluated: list[date] = []
             try:
                 for check in checks:
                     if check.skip:
@@ -1004,17 +1071,33 @@ def run_backtest(
                         continue
                     loop.run_session(next(loaded))
                     rec.evaluated(check.session)
+                    evaluated.append(check.session)
             finally:
                 loaded.close()
         attempts = account.finish()
         trades = tuple(loop.trades)
         outcomes = tuple(loop.outcomes)
+        setups = loop.shadows.records
+        shadow_trades = loop.shadows.shadow_trades
+        enabled = tuple(g for g in cfg.gates.order if cfg.gates.enabled(g))
+        funnel = gate_funnel(
+            setups,
+            trades,
+            enabled,
+            min_sample=cfg.reporting.shadow_min_sample,
+            sessions=evaluated,
+        )
+        inputs = _report_inputs(cfg, instruments, enabled, holdout, evaluated, loop)
         rec.output(writer.write_text(run_dir / TRADES_CSV_FILE_NAME, trades_csv(trades)))
         rec.output(writer.write_json(run_dir / TRADES_JSON_FILE_NAME, to_jsonable(list(trades))))
         rec.output(writer.write_json(run_dir / ATTEMPTS_FILE_NAME, to_jsonable(list(attempts))))
         rec.output(
             writer.write_json(run_dir / SESSION_OUTCOMES_FILE_NAME, to_jsonable(list(outcomes)))
         )
+        rec.output(writer.write_json(run_dir / SETUPS_FILE_NAME, to_jsonable(list(setups))))
+        rec.output(writer.write_text(run_dir / SHADOW_TRADES_FILE_NAME, trades_csv(shadow_trades)))
+        rec.output(writer.write_json(run_dir / FUNNEL_FILE_NAME, funnel_to_jsonable(funnel)))
+        rec.output(writer.write_json(run_dir / REPORT_INPUTS_FILE_NAME, inputs))
     manifest = rec.manifest
     assert manifest is not None  # run_manifest sets it on a normal exit
     return BacktestResult(
@@ -1027,4 +1110,104 @@ def run_backtest(
         outcomes=outcomes,
         gaps=gaps,
         skipped=manifest.sessions_skipped,
+        setups=setups,
+        shadow_trades=shadow_trades,
+        funnel=funnel,
+        tap_counts=tuple(loop.tap_counts),
+        agreement=loop.agreement,
+        holdout=holdout,
+    )
+
+
+def _holdout(
+    cfg: StrategyConfig, cache: DataCache, calendar: SessionCalendar, spec: _LoadSpec
+) -> HoldoutPeriod | None:
+    """The Holdout_Period of the calendar sessions the cache holds full data for (Req 22.1).
+
+    ``None`` when no session has full data.
+    """
+    checks = check_sessions(
+        cache,
+        calendar,
+        calendar.sessions(),
+        symbols=spec.symbols,
+        view_id=spec.view_id,
+        instruments=spec.instruments,
+    )
+    with_data = [c.session for c in checks if not c.skip]
+    if not with_data:
+        return None
+    try:
+        return compute_holdout_period(with_data, cfg.experiments.holdout_fraction)
+    except HoldoutError:
+        return None
+
+
+def _has_first_target(cfg: StrategyConfig) -> bool:
+    """Whether an Exit_Mode the config can select sets a first target (not Trailing)."""
+    modes = {cfg.exits.setting_for(regime).mode for regime in (None, *EXIT_REGIMES)}
+    return modes != {"trailing"}
+
+
+def _report_inputs(
+    cfg: StrategyConfig,
+    instruments: Sequence[str],
+    enabled: Sequence[str],
+    holdout: HoldoutPeriod | None,
+    evaluated: Sequence[date],
+    loop: _Loop,
+) -> JsonValue:
+    """What ``fse report`` reads besides the trades and the Gate_Funnel (Req 20.15, 18.11)."""
+    costs: dict[str, object] = {}
+    for instrument in instruments:
+        found = cfg.fills.costs_for(instrument)
+        if found is not None:
+            costs[instrument] = {"commission": found.commission, "exchange_fee": found.exchange_fee}
+    held: dict[str, object] | None = None
+    if holdout is not None:
+        held = {
+            "fraction": holdout.fraction,
+            "first": holdout.first,
+            "last": holdout.last,
+            "sessions": len(holdout),
+            "included": [d for d in evaluated if d in holdout],
+        }
+    rep = cfg.reporting
+    a = loop.agreement
+    return to_jsonable(
+        {
+            "decision_cadence_s": cfg.time.decision_cadence_s,
+            "bar_interval_s": BASE_INTERVAL_S,
+            "instruments": list(instruments),
+            "fills": {
+                "trade_through_ticks": cfg.fills.trade_through_ticks,
+                "slippage_ticks": cfg.fills.slippage_ticks,
+                "costs": costs,
+            },
+            "metrics": {
+                "scratch_tolerance_r": Decimal(repr(rep.scratch_tolerance_r)),
+                "min_sample_trades": rep.min_sample_trades,
+                "primary_win_rate": rep.primary_win_rate,
+                "has_first_target": _has_first_target(cfg),
+            },
+            "shadow_min_sample": rep.shadow_min_sample,
+            "enabled_gates": list(enabled),
+            "holdout": held,
+            "node_agreement": {
+                "compared": a.compared,
+                "without_labels": a.without_labels,
+                "king_agree": a.king_agree,
+                "gatekeeper_both": a.gatekeeper_both,
+                "gatekeeper_either": a.gatekeeper_either,
+            },
+            "tap_counts": [
+                {
+                    "session": c.session,
+                    "bar_interval_s": c.bar_interval_s,
+                    "taps": c.taps,
+                    "inter_decision": c.inter_decision,
+                }
+                for c in loop.tap_counts
+            ],
+        }
     )

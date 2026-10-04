@@ -77,7 +77,10 @@ configured instrument, is skipped and listed in the Run_Manifest. With
 before the first Decision_Time.
 
 The run directory gets decision_log.jsonl, trades.csv, trades.json,
-combine_attempts.json, session_outcomes.json and run_manifest.json."""
+combine_attempts.json, session_outcomes.json, setups.json (each Setup_Key's
+final status and Shadow_Trade), shadow_trades.csv, gate_funnel.json,
+report_inputs.json and run_manifest.json. fse report --run <run id> writes
+the report from them."""
 
 _EPILOG = """\
 exit status:

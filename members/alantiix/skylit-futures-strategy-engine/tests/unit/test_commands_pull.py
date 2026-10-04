@@ -3,13 +3,17 @@
 The pull itself is tested in ``test_data_puller.py`` and end to end in task
 5.12. Here every run either stops before any network request or, for the size
 limit, reaches only the free ``/v1/account`` and ``/v1/symbols`` mocks. The
-key is fake; every directory is under ``tmp_path``.
+key is fake; every directory is under ``tmp_path``. ``--config`` sets only
+dark-pool fetching (task 20.4): the tickers follow ``--dark-pool``,
+``--dark-pool-tickers`` and the ``dark_pool_confluence`` Gate, and a config
+that does not load stops the pull before any request.
 
-**Validates: Requirements 3.1, 3.2, 3.14**
+**Validates: Requirements 3.1, 3.2, 3.14, 4.12**
 """
 
 from __future__ import annotations
 
+import argparse
 import io
 from datetime import date, timedelta
 from pathlib import Path
@@ -20,11 +24,15 @@ import respx
 
 from fse import cli
 from fse.commands import pull
+from fse.commands._config import load_config
+from fse.config.schema import StrategyConfig
 from fse.data.cache import HeatmapView
 from fse.data.planner import PullSpec
 from fse.data.puller import PullOptions
+from fse.logio import LogWriter, Redactor
 from fse.skylit import endpoints as ep
 from fse.skylit.fetch_log import FETCH_LOG_FILE_NAME
+from tests.fakes.configs import MINIMAL_CONFIG_YAML, minimal_config_data
 
 KEY = "fake-skylit-key-0000"
 CALENDARS = Path(__file__).resolve().parents[2] / "calendars"
@@ -129,6 +137,66 @@ def test_invalid_input_exits_2_before_any_request(
     assert reason in err
     assert not respx_router.calls
     assert not (tmp_path / "out").exists()
+
+
+def config(dark_pool: bool, **gate: str) -> StrategyConfig:
+    data = minimal_config_data()
+    data["gates"] = {"dark_pool_confluence": {"enabled": dark_pool, **gate}}
+    return StrategyConfig.model_validate(data)
+
+
+def args(*flags: str) -> argparse.Namespace:
+    return cli.build_parser().parse_args(["pull", *RANGE, *flags])
+
+
+@pytest.mark.parametrize(
+    ("cfg", "flags", "tickers"),
+    [
+        (None, (), ()),
+        (None, ("--dark-pool",), ("SPY", "QQQ")),
+        (config(False), (), ()),
+        (config(False), ("--dark-pool",), ("SPY", "QQQ")),
+        (config(True), (), ("SPY", "QQQ")),
+        (config(True, es_ticker="SPX", nq_ticker="NDX"), (), ("SPX", "NDX")),
+        (config(True), ("--dark-pool-tickers", "IWM"), ("IWM",)),
+        (config(False), ("--dark-pool", "--dark-pool-tickers", "IWM,DIA"), ("IWM", "DIA")),
+    ],
+)
+def test_dark_pool_tickers_follow_the_config_and_the_flags(
+    cfg: StrategyConfig | None, flags: tuple[str, ...], tickers: tuple[str, ...]
+) -> None:
+    assert pull.dark_pool_tickers(args(*flags), cfg) == tickers
+    assert pull.options_from_args(args(*flags), cfg).dark_pool_tickers == tickers
+
+
+def test_dark_pool_tickers_without_fetching_is_a_usage_error() -> None:
+    with pytest.raises(pull.PullUsageError, match="applies only with --dark-pool or a --config"):
+        pull.dark_pool_tickers(args("--dark-pool-tickers", "IWM"), config(False))
+
+
+def test_a_bad_config_exits_2_before_any_request(
+    tmp_path: Path, respx_router: respx.MockRouter
+) -> None:
+    respx_router.reset()
+    bad = tmp_path / "bad.yaml"
+    bad.write_text("regime: {}\n", encoding="utf-8")
+    code, _, err = run([*RANGE, "--config", str(bad)], tmp_path, {"SKYLIT_API_KEY": KEY})
+
+    assert code == 2
+    assert "regime.min_abs_value" in err
+    assert not respx_router.calls
+    assert not (tmp_path / "out").exists()
+
+
+def test_a_config_enabling_dark_pool_confluence_sets_the_tickers(tmp_path: Path) -> None:
+    good = tmp_path / "good.yaml"
+    good.write_text(
+        MINIMAL_CONFIG_YAML + "gates:\n  dark_pool_confluence: {enabled: true}\n", encoding="utf-8"
+    )
+    parsed = cli.build_parser().parse_args(["pull", *RANGE, "--config", str(good)])
+    cfg = load_config(parsed.config, LogWriter(Redactor([])))
+
+    assert pull.options_from_args(parsed, cfg).dark_pool_tickers == ("SPY", "QQQ")
 
 
 def test_an_end_date_after_today_exits_2(tmp_path: Path, respx_router: respx.MockRouter) -> None:

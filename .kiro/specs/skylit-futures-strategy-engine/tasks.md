@@ -685,8 +685,8 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
   - Operator: run `fse calibrate regime-min-abs --start <date> --end <date> --percentile <P>`, choose a value, set `regime.min_abs_value`, and record the derivation in `docs/traceability.md`.
   - Operator: fill in "date checked" in `docs/account-rules.md` after checking the Topstep help center. This is required before Combine Order_Mode.
 
-- [ ] 22. Shadow trades, Gate_Funnel, metrics and reports
-  - [ ] 22.1 Implement the ShadowBook
+- [x] 22. Shadow trades, Gate_Funnel, metrics and reports
+  - [x] 22.1 Implement the ShadowBook
     - `src/fse/backtest/shadow.py`, per design §19:
       - use the governing evaluation, with one shadow per rejected Setup_Key at base contracts
       - follow the same lifecycle rules
@@ -694,7 +694,7 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
     - Wire the ShadowBook into the log phase of `src/fse/backtest/runner.py`
     - _Requirements: 19.2, 19.8, 19.9_
 
-  - [ ] 22.2 Implement the Gate_Funnel
+  - [x] 22.2 Implement the Gate_Funnel
     - `src/fse/analytics/funnel.py`:
       - final statuses
       - per-Gate fail, only-fail and first-fail counts
@@ -717,7 +717,7 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
     - `src/fse/experiments/holdout.py`: the newest ceil(fraction × n) sessions with data, fraction from 0.05 to 0.50
     - _Requirements: 22.1_
 
-  - [ ] 22.5 Implement the Report_Generator core and `fse report`
+  - [x] 22.5 Implement the Report_Generator core and `fse report`
     - `src/fse/reports/markdown.py`, `src/fse/reports/tables.py` and `src/fse/commands/report.py` (`fse report --run <run_id>`), with Markdown plus CSV or JSON output:
       - the Requirement 20.15 header, including whether any Holdout_Period session is included
       - the "touch fills (optimistic)" label, not-applicable rendering and low-sample labels
@@ -727,15 +727,15 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
       - the per-trade MAE and MFE file
     - _Requirements: 6.22, 6.23, 13.2, 18.11, 19.6, 19.7, 19.10, 19.17, 20.1, 20.6, 20.13, 20.15, 20.16_
 
-  - [ ] 22.6 Write property test for funnel accounting
+  - [x] 22.6 Write property test for funnel accounting
     - **Property 56: Funnel accounting**
     - **Validates: Requirements 19.1, 19.3, 19.4, 19.5, 19.6, 19.7, 19.8, 19.17**
 
-  - [ ] 22.7 Write property test that shadow trades do not leak
+  - [x] 22.7 Write property test that shadow trades do not leak
     - **Property 57: Shadow trades do not leak**
     - **Validates: Requirements 19.9, 14.5**
 
-  - [ ] 22.8 Write property test for shadow edge flags
+  - [x] 22.8 Write property test for shadow edge flags
     - **Property 58: Shadow edge flags**
     - **Validates: Requirements 19.10, 19.11, 19.12**
 
@@ -743,11 +743,11 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
     - **Property 60: Metrics match the reference model**
     - **Validates: Requirements 20.1, 20.2, 20.3, 20.4, 20.5, 20.6, 20.16**
 
-  - [ ] 22.10 Write property test for the inter-decision Tap count
+  - [x] 22.10 Write property test for the inter-decision Tap count
     - **Property 55: Inter-decision Tap count**
     - **Validates: Requirements 18.11**
 
-  - [ ] 22.11 Write unit test for a zero-trade report
+  - [x] 22.11 Write unit test for a zero-trade report
     - Not-applicable metrics, trade count 0, and the report finishes
     - _Requirements: 20.16_
 

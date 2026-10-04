@@ -46,7 +46,9 @@ opens at 13:00 (Observation_Time 13:01). It does so at 60, 600, 900 and 1800 s.
 
 **Running** (:func:`run`): :func:`fse.backtest.runner.run_backtest` on a cache
 written by :func:`write_cache`, with a constant manifest clock and a fixed
-code version, so equal inputs give byte-identical output files.
+code version, so equal inputs give byte-identical output files. Its
+``shadow_mode`` is the ShadowBook mode; :func:`with_cadence` reruns a config
+at another Decision_Cadence.
 """
 
 from __future__ import annotations
@@ -64,6 +66,7 @@ from hypothesis import strategies as st
 
 from fse.backtest.manifest import DataRange
 from fse.backtest.runner import BacktestResult, run_backtest
+from fse.backtest.shadow import ShadowMode
 from fse.calendars import ECONOMIC_EVENTS_FILE, EXCHANGE_CALENDAR_FILE, ROLL_CALENDAR_FILE
 from fse.config.schema import StrategyConfig
 from fse.config.schema.account import AccountConfig
@@ -97,6 +100,7 @@ __all__ = [
     "build_session",
     "early_close_hold",
     "fixed_config",
+    "funnel_case",
     "make_bar",
     "make_snapshot",
     "market_inputs",
@@ -106,6 +110,7 @@ __all__ = [
     "run",
     "strategy_configs",
     "vix_bar",
+    "with_cadence",
     "write_cache",
     "write_calendars",
 ]
@@ -510,6 +515,13 @@ def strategy_configs(draw: st.DrawFn) -> StrategyConfig:
     return StrategyConfig.model_validate(data)
 
 
+def with_cadence(cfg: StrategyConfig, cadence_s: int) -> StrategyConfig:
+    """``cfg`` with another Decision_Cadence, validated again."""
+    data = cfg.model_dump(mode="python", by_alias=True)
+    data["time"]["decision_cadence_s"] = cadence_s
+    return StrategyConfig.model_validate(data)
+
+
 def fixed_config(cadence_s: int) -> StrategyConfig:
     """The minimal config for SPX and QQQ with every Gate and size-down rule off."""
     data = minimal_config_data()
@@ -522,6 +534,32 @@ def fixed_config(cadence_s: int) -> StrategyConfig:
         }
     )
     return StrategyConfig.model_validate(data)
+
+
+FUNNEL_GATES: Final[tuple[str, ...]] = ("midpoint", "candle_color", "tap_count")
+
+
+def funnel_case() -> tuple[MarketInputs, StrategyConfig]:
+    """A pinned run with every final status and Shadow_Trades (Properties 56 and 57).
+
+    2026-03-02 and 03-03, seeds 1002 and 1003, at 300 s with only the
+    :data:`FUNNEL_GATES` on and no size-down rule: 22 Setup_Keys (1 filled,
+    1 cancelled, 17 rejected, 3 untapped), 9 Shadow_Trades and 2 accepted
+    trades, one of them of a key whose governing evaluation was rejected.
+    """
+    sessions = tuple(
+        build_session(d, 1000 + d.day, bar_opens(d, 60, (100, 40))) for d in SESSIONS[:2]
+    )
+    data = minimal_config_data()
+    data.update(
+        {
+            "time": {"decision_cadence_s": 300},
+            "data": {"symbols": list(SYMBOLS), "nq_sources": ["QQQ"]},
+            "gates": {g: {"enabled": g in FUNNEL_GATES} for g in GATE_IDS},
+            "sizing": {"trinity_size_down": {"enabled": False}, "vix_gap": {"enabled": False}},
+        }
+    )
+    return MarketInputs(sessions), StrategyConfig.model_validate(data)
 
 
 def early_close_hold() -> MarketInputs:
@@ -588,6 +626,7 @@ def run(
     offline: bool = False,
     stdout: io.StringIO | None = None,
     stderr: io.StringIO | None = None,
+    shadow_mode: ShadowMode = "rejected",
 ) -> BacktestResult:
     """:func:`run_backtest` with :data:`SEED`, a constant manifest clock and a fake secret."""
     writer = LogWriter(
@@ -608,4 +647,5 @@ def run(
             workers=workers,
             clock=lambda: STARTED,
             code_version=CODE_VERSION,
+            shadow_mode=shadow_mode,
         )

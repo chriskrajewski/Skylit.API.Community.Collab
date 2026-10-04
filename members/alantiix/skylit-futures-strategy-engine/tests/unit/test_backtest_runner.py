@@ -38,7 +38,11 @@ from fse.backtest.manifest import MANIFEST_FILE_NAME, DataRange
 from fse.backtest.runner import (
     ATTEMPTS_FILE_NAME,
     BACKTEST_OUTPUT_FILES,
+    FUNNEL_FILE_NAME,
+    REPORT_INPUTS_FILE_NAME,
     SESSION_OUTCOMES_FILE_NAME,
+    SETUPS_FILE_NAME,
+    SHADOW_TRADES_FILE_NAME,
     TRADE_COLUMNS,
     TRADES_CSV_FILE_NAME,
     TRADES_JSON_FILE_NAME,
@@ -253,6 +257,10 @@ def test_the_manifest_records_evaluated_and_skipped_sessions(baseline: BacktestR
         TRADES_JSON_FILE_NAME,
         ATTEMPTS_FILE_NAME,
         SESSION_OUTCOMES_FILE_NAME,
+        SETUPS_FILE_NAME,
+        SHADOW_TRADES_FILE_NAME,
+        FUNNEL_FILE_NAME,
+        REPORT_INPUTS_FILE_NAME,
     ]
     assert sorted(p.name for p in baseline.run_dir.iterdir()) == sorted(BACKTEST_OUTPUT_FILES)
 

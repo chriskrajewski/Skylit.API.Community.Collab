@@ -16,11 +16,14 @@ Each example writes one synthetic Data_Cache and the test calendar files
 
 The two runs' output files are byte-identical: the decision log (every
 Candidate_Setup, Detection_Skip, Gate result, Grade and order in order), the
-trade list as CSV and JSON, the Combine_Attempts, the session outcomes and the
-Run_Manifest (the manifest clock is constant). The returned trades,
-Combine_Attempts, session outcomes, gaps and skipped sessions are equal field
-by field. The Gate_Funnel is written by the Report_Generator (task 22), so it
-is not part of this run's files.
+trade list as CSV and JSON, the Combine_Attempts, the session outcomes, the
+Setup_Key records with their Shadow_Trades, the Shadow_Trade list, the
+Gate_Funnel, the report inputs and the Run_Manifest (the manifest clock is
+constant). The returned trades, Combine_Attempts, session outcomes, Setup_Key
+records, Gate_Funnel, gaps and skipped sessions are equal field by field.
+
+Pinned example: :func:`~tests.strategies.backtest_inputs.funnel_case`, a run
+with every final status and nine Shadow_Trades, with two loader workers.
 
 **Validates: Requirements 10.15, 18.5**
 """
@@ -31,7 +34,7 @@ import json
 import tempfile
 from pathlib import Path
 
-from hypothesis import event, given
+from hypothesis import event, example, given
 from hypothesis import strategies as st
 
 from fse.backtest.decision_log import DECISION_LOG_FILE_NAME
@@ -39,6 +42,7 @@ from fse.backtest.runner import BACKTEST_OUTPUT_FILES
 from fse.config.schema import StrategyConfig
 from tests.strategies.backtest_inputs import (
     MarketInputs,
+    funnel_case,
     market_inputs,
     run,
     strategy_configs,
@@ -46,8 +50,11 @@ from tests.strategies.backtest_inputs import (
     write_calendars,
 )
 
+PINNED = funnel_case()
+
 
 # Feature: skylit-futures-strategy-engine, Property 34: Backtest determinism
+@example(market=PINNED[0], cfg=PINNED[1], workers=2)
 @given(
     market=market_inputs(gaps=True),
     cfg=strategy_configs(),
@@ -73,6 +80,7 @@ def test_equal_inputs_give_byte_identical_outputs(
         assert second.trades == first.trades
         assert second.attempts == first.attempts
         assert second.outcomes == first.outcomes
+        assert (second.setups, second.funnel) == (first.setups, first.funnel)
         assert (second.gaps, second.skipped) == (first.gaps, first.skipped)
 
         log = (first.run_dir / DECISION_LOG_FILE_NAME).read_text(encoding="utf-8")
