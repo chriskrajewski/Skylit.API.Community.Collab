@@ -16,8 +16,14 @@ completed sessions' stored windows are served from the Data_Cache.
 ProjectX is the alternate bar source (Req 4.3) and the only source of
 sub-minute bars (OQ9). It is set up only when ``PROJECTX_USERNAME`` and
 ``PROJECTX_API_KEY`` are both set, and logs in only when a bar request needs
-it. ``--config`` (task 20.4) will set dark-pool fetching from the
-Strategy_Config; until then ``--dark-pool`` turns it on.
+it.
+
+Dark-pool prints (Req 4.12) are fetched when ``--config`` names a
+Strategy_Config that enables ``gates.dark_pool_confluence``, or when
+``--dark-pool`` forces it. The tickers are ``--dark-pool-tickers``, else the
+Gate's ``es_ticker`` and ``nq_ticker`` from ``--config``, else SPY and QQQ.
+The config is loaded, with every error reported (exit 2), before any network
+request.
 """
 
 from __future__ import annotations
@@ -38,6 +44,8 @@ import httpx
 from fse.calendars import Calendars, load_calendars, project_calendar_dir
 from fse.clock import Clock, SystemClock
 from fse.commands import CommandContext, SubParsers
+from fse.commands._config import load_config
+from fse.config.schema import StrategyConfig
 from fse.data.cache import (
     STORAGE_INTERVAL_MAX_S,
     STORAGE_INTERVAL_MIN_S,
@@ -86,6 +94,7 @@ __all__ = [
     "EXIT_INVALID_INPUT",
     "NAME",
     "PullUsageError",
+    "dark_pool_tickers",
     "new_pull_id",
     "options_from_args",
     "register",
@@ -103,8 +112,9 @@ _DEFAULT_TIMES: Final = SessionTimes()
 
 _DESCRIPTION = """\
 Pull Heatseeker history into the Data_Cache for a range of sessions (start and
-end inclusive), with ES and NQ bars, VIX daily values and, with --dark-pool,
-dark-pool prints.
+end inclusive), with ES and NQ bars, VIX daily values and dark-pool prints when
+the --config Strategy_Config enables dark_pool_confluence or --dark-pool is
+given.
 
 Sessions less than 365 days old come from GET /v1/historical/range at full
 resolution; older sessions are sampled with GET /v1/historical every
@@ -244,6 +254,13 @@ def register(subparsers: SubParsers) -> None:
     add("--start", type=_date, required=True, metavar="YYYY-MM-DD", help="first session")
     add("--end", type=_date, required=True, metavar="YYYY-MM-DD", help="last session")
     add(
+        "--config",
+        type=Path,
+        metavar="FILE",
+        help="a Strategy_Config: dark-pool prints are fetched when it enables "
+        "gates.dark_pool_confluence, for its es_ticker and nq_ticker",
+    )
+    add(
         "--symbols",
         type=_name_list,
         default=DEFAULT_SYMBOLS,
@@ -347,14 +364,14 @@ def register(subparsers: SubParsers) -> None:
     aux.add_argument(
         "--dark-pool",
         action="store_true",
-        help="fetch dark-pool prints, for a config that enables dark_pool_confluence",
+        help="fetch dark-pool prints even when --config does not enable dark_pool_confluence",
     )
     aux.add_argument(
         "--dark-pool-tickers",
         type=_name_list,
         metavar="LIST",
-        help="dark-pool tickers, with --dark-pool "
-        f"(default: {','.join(DEFAULT_DARK_POOL_TICKERS)})",
+        help="dark-pool tickers, when dark-pool prints are fetched (default: the --config "
+        f"Gate's es_ticker and nq_ticker, else {','.join(DEFAULT_DARK_POOL_TICKERS)})",
     )
 
     paths = parser.add_argument_group("paths")
@@ -390,15 +407,34 @@ def session_times_from_args(args: argparse.Namespace) -> SessionTimes:
         raise PullUsageError(f"--pull-window: {exc}") from None
 
 
-def options_from_args(args: argparse.Namespace) -> PullOptions:
-    """The parsed flags as :class:`PullOptions`; :class:`PullUsageError` (exit 2) if invalid."""
-    tickers: tuple[str, ...] = ()
-    if args.dark_pool:
-        tickers = (
-            DEFAULT_DARK_POOL_TICKERS if args.dark_pool_tickers is None else args.dark_pool_tickers
-        )
-    elif args.dark_pool_tickers is not None:
-        raise PullUsageError("--dark-pool-tickers applies only with --dark-pool")
+def dark_pool_tickers(args: argparse.Namespace, cfg: StrategyConfig | None) -> tuple[str, ...]:
+    """The dark-pool tickers to fetch, ``()`` for none (Req 4.12).
+
+    Fetching is on with ``--dark-pool`` or when ``cfg`` enables
+    ``gates.dark_pool_confluence``. The tickers are ``--dark-pool-tickers``,
+    else the Gate's ``es_ticker`` and ``nq_ticker`` from ``cfg``, else SPY and QQQ.
+    """
+    gate = None if cfg is None else cfg.gates.dark_pool_confluence
+    if not (args.dark_pool or (gate is not None and gate.enabled)):
+        if args.dark_pool_tickers is not None:
+            raise PullUsageError(
+                "--dark-pool-tickers applies only with --dark-pool or a --config that "
+                "enables gates.dark_pool_confluence"
+            )
+        return ()
+    if args.dark_pool_tickers is not None:
+        return tuple(args.dark_pool_tickers)
+    if gate is not None:
+        return tuple(dict.fromkeys((gate.es_ticker, gate.nq_ticker)))
+    return DEFAULT_DARK_POOL_TICKERS
+
+
+def options_from_args(args: argparse.Namespace, cfg: StrategyConfig | None = None) -> PullOptions:
+    """The parsed flags as :class:`PullOptions`; :class:`PullUsageError` (exit 2) if invalid.
+
+    ``cfg`` is the ``--config`` Strategy_Config; it sets only dark-pool fetching.
+    """
+    tickers = dark_pool_tickers(args, cfg)
     try:
         view = HeatmapView(
             max_strikes=args.max_strikes,
@@ -442,7 +478,9 @@ def new_pull_id(started_ns: Instant) -> str:
 
 def run_pull_command(args: argparse.Namespace, ctx: CommandContext) -> int:
     """Check everything local, then run the pull. Failures raise with an exit code."""
-    options = options_from_args(args)
+    config_path: Path | None = args.config
+    cfg = None if config_path is None else load_config(config_path, ctx.writer)
+    options = options_from_args(args, cfg)
     times = session_times_from_args(args)
     calendar_dir: Path | None = args.calendar_dir
     if calendar_dir is None:

@@ -628,7 +628,7 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
     - Call `run_backtest` in offline mode on a synthetic cache with `SKYLIT_API_KEY` unset. Assert zero network calls, no key error, and the gap printout
     - _Requirements: 1.8, 3.12, 3.13_
 
-- [ ] 20. Config_Loader, Config_Printer, Playbook_Baseline and traceability
+- [x] 20. Config_Loader, Config_Printer, Playbook_Baseline and traceability
   - [x] 20.1 Implement the root schema, loader, printer, warnings and hash
     - `src/fse/config/schema/__init__.py`: the root `StrategyConfig`, assembling every section module, with `order_mode` default `paper`
     - New section modules `live.py`, `notify.py`, `reporting.py` and `experiments.py`, per design "Strategy_Config shape"
@@ -651,7 +651,7 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
       - with a test-only overlay of fake values, it loads with no error in Paper Order_Mode
     - _Requirements: 7.4, 13.8, 17.9_
 
-  - [ ] 20.3 Write the traceability table
+  - [x] 20.3 Write the traceability table
     - `docs/traceability.md`: one row per Skill_Document rule (each "Hard passes" item is one row). Each row gives:
       - the source document and section
       - the key path and Playbook_Baseline value, or "not codified" with a reason
@@ -662,7 +662,7 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
     - `tests/unit/test_traceability.py`
     - _Requirements: 17.10, 17.11_
 
-  - [ ] 20.4 Implement `fse backtest` and `fse pull --config`
+  - [x] 20.4 Implement `fse backtest` and `fse pull --config`
     - `src/fse/commands/backtest.py`: `fse backtest --config --start --end [--offline] [--seed] [--out]`
     - Update `src/fse/commands/pull.py` so `--config` sets dark-pool fetching from `gates.dark_pool_confluence.enabled`. `--dark-pool` still forces fetching
     - _Requirements: 4.12, 18.1, 18.2_
