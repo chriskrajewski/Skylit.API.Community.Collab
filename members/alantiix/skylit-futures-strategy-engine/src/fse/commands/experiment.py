@@ -131,7 +131,9 @@ PER_ROW_TRADES: Final = "see the trade count of each configuration below"
 _EPILOG = """\
 exit status:
   0    the experiment completed and its report was written
-  1    unexpected error; the Run_Manifest is written with status aborted
+  1    unexpected error; the Run_Manifest is written with status aborted,
+       or, when the error is in writing the Markdown report after the run,
+       the Run_Manifest stays completed and the JSON output is kept
   2    invalid input: a flag, the Strategy_Config, a sweep or candidate file,
        the date range, a calendar file, a path, too few sessions, or a
        directory that already holds the experiment's output

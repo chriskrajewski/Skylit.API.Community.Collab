@@ -879,7 +879,7 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
     - `tests/perf/test_backtest_budget.py` (marker `perf`, run manually): run the Playbook_Baseline, with fake cost overlays, on a synthetic 250-session cache at 60 s cadence. The Run_Manifest must be written within 10 minutes
     - _Requirements: 18.12_
 
-- [ ] 29. Checkpoint - Measurement complete
+- [x] 29. Checkpoint - Measurement complete
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 30. Revised_Drafts

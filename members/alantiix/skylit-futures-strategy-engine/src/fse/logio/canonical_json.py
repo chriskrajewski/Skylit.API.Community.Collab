@@ -64,7 +64,7 @@ def dumps_bytes(obj: object) -> bytes:
 
 def to_jsonable(obj: object) -> JsonValue:
     """``obj`` as plain JSON values, with every mapping's keys in sorted order."""
-    return _convert(obj, "$")
+    return _convert(obj, None)
 
 
 def ny_iso(t: Instant) -> str:
@@ -100,44 +100,68 @@ def _require_instant(t: object) -> None:
         raise TypeError(f"an Instant must be an int of ns UTC, not {type(t).__name__}")
 
 
-def _convert(obj: object, path: str) -> JsonValue:
+# Where a value sits, built only when an error message needs it: ``None`` is the
+# root ``$``; otherwise the parent path and a mapping key (``str``), a sequence
+# index (``int``) or ``_SET_ITEM`` for a set member.
+type _Path = tuple[_Path, str | int] | None
+
+_SET_ITEM: Final = -1
+
+
+def _path_text(path: _Path) -> str:
+    """``path`` as ``$.key[0]``: ``.key`` for a mapping key, ``[i]`` for an index."""
+    parts: list[str] = []
+    while path is not None:
+        path, step = path
+        if isinstance(step, str):
+            parts.append(f".{step}")
+        elif step == _SET_ITEM:
+            parts.append("[]")
+        else:
+            parts.append(f"[{step}]")
+    return "$" + "".join(reversed(parts))
+
+
+def _convert(obj: object, path: _Path) -> JsonValue:
     handler = _EXACT.get(type(obj))
     if handler is not None:
         return handler(obj, path)
     return _convert_other(obj, path)
 
 
-def _same(obj: object, path: str) -> JsonValue:
+def _same(obj: object, path: _Path) -> JsonValue:
     return cast("bool | int | str | None", obj)  # exact None, bool, int or str only
 
 
-def _from_float(obj: object, path: str) -> JsonValue:
+def _from_float(obj: object, path: _Path) -> JsonValue:
     value = float(cast("float", obj))
     if not math.isfinite(value):
-        raise ValueError(f"cannot encode the non-finite float {value!r} at {path}")
+        raise ValueError(f"cannot encode the non-finite float {value!r} at {_path_text(path)}")
     return value
 
 
-def _from_sequence(obj: object, path: str) -> JsonValue:
+def _from_sequence(obj: object, path: _Path) -> JsonValue:
     items = cast("list[object] | tuple[object, ...]", obj)
-    return [_convert(item, f"{path}[{i}]") for i, item in enumerate(items)]
+    return [_convert(item, (path, i)) for i, item in enumerate(items)]
 
 
-def _from_mapping(obj: object, path: str) -> JsonValue:
+def _from_mapping(obj: object, path: _Path) -> JsonValue:
     mapping = cast("Mapping[object, object]", obj)
     out: dict[str, JsonValue] = {}
     for raw_key, item in mapping.items():
         key = raw_key.value if isinstance(raw_key, enum.Enum) else raw_key
         if not isinstance(key, str):
-            raise TypeError(f"object keys must be str, got {type(raw_key).__name__} at {path}")
+            raise TypeError(
+                f"object keys must be str, got {type(raw_key).__name__} at {_path_text(path)}"
+            )
         key = str.__str__(key)
         if key in out:
-            raise ValueError(f"two keys encode as {key!r} at {path}")
-        out[key] = _convert(item, f"{path}.{key}")
+            raise ValueError(f"two keys encode as {key!r} at {_path_text(path)}")
+        out[key] = _convert(item, (path, key))
     return dict(sorted(out.items()))
 
 
-_EXACT: Final[dict[type, Callable[[object, str], JsonValue]]] = {
+_EXACT: Final[dict[type, Callable[[object, _Path], JsonValue]]] = {
     type(None): _same,
     bool: _same,
     int: _same,
@@ -149,7 +173,7 @@ _EXACT: Final[dict[type, Callable[[object, str], JsonValue]]] = {
 }
 
 
-def _convert_other(obj: object, path: str) -> JsonValue:
+def _convert_other(obj: object, path: _Path) -> JsonValue:
     if isinstance(obj, enum.Enum):
         return _convert(obj.value, path)
     if isinstance(obj, str):
@@ -158,7 +182,7 @@ def _convert_other(obj: object, path: str) -> JsonValue:
         return _from_float(obj, path)
     if isinstance(obj, Decimal):
         if not obj.is_finite():
-            raise ValueError(f"cannot encode the non-finite Decimal {obj} at {path}")
+            raise ValueError(f"cannot encode the non-finite Decimal {obj} at {_path_text(path)}")
         return str(obj)
     if isinstance(obj, numbers.Integral):
         return operator.index(obj)
@@ -167,14 +191,18 @@ def _convert_other(obj: object, path: str) -> JsonValue:
     if isinstance(obj, list | tuple):
         return _from_sequence(obj, path)
     if isinstance(obj, set | frozenset):
-        items = [_convert(item, f"{path}[]") for item in obj]
+        items = [_convert(item, (path, _SET_ITEM)) for item in obj]
         return sorted(items, key=_encode)
     if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
         return _from_mapping({f.name: getattr(obj, f.name) for f in dataclasses.fields(obj)}, path)
     if isinstance(obj, datetime):
-        raise TypeError(f"cannot encode a datetime at {path}; use an Instant (int ns UTC)")
+        raise TypeError(
+            f"cannot encode a datetime at {_path_text(path)}; use an Instant (int ns UTC)"
+        )
     if isinstance(obj, date):
         return obj.isoformat()
     if isinstance(obj, PurePath):
         return str(obj)
-    raise TypeError(f"cannot encode {type(obj).__qualname__} at {path} as canonical JSON")
+    raise TypeError(
+        f"cannot encode {type(obj).__qualname__} at {_path_text(path)} as canonical JSON"
+    )
