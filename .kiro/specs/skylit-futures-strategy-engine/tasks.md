@@ -679,7 +679,7 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
     - **Property 52: Defaults and contradiction warnings**
     - **Validates: Requirements 17.1, 17.2, 17.6**
 
-- [ ] 21. Checkpoint - Operator sets the required config values
+- [x] 21. Checkpoint - Operator sets the required config values
   - Ensure all tests pass, ask the user if questions arise.
   - Operator: enter the current commission and exchange fee per traded instrument (MES, MNQ) in `configs/playbook_baseline.yaml`.
   - Operator: run `fse calibrate regime-min-abs --start <date> --end <date> --percentile <P>`, choose a value, set `regime.min_abs_value`, and record the derivation in `docs/traceability.md`.
