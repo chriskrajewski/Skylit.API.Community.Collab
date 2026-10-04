@@ -23,10 +23,13 @@ configuration ("not available").
   than ``reporting.min_sample_trades``. Every report and table row then
   labels its Primary_Win_Rate, expectancy and confidence intervals
   (:data:`LOW_SAMPLE_COLUMNS`) low-sample, the reference list included.
+- ``pass_insufficient_sample`` (Req 21.11): the configuration's pass
+  estimate drew from fewer sessions than ``experiments.montecarlo.min_sessions``;
+  every output that shows its Combine_Pass probability labels it.
 
 :func:`frontier_to_jsonable` writes the rows, the Pareto labels, the
-reference list and the ranking as JSON (``frontier.json``); the Markdown and
-CSV renderings are the Report_Generator's (task 28.1).
+reference list and the ranking as JSON (``frontier.json``);
+:func:`fse.reports.markdown.render_frontier` renders the Markdown table.
 
 The module is pure: no I/O.
 """
@@ -107,6 +110,7 @@ class FrontierRow:
     intervals: BootstrapIntervals | None
     low_sample: bool
     insufficient_sample: bool
+    pass_insufficient_sample: bool = False
 
     @property
     def pareto_point(self) -> ParetoPoint:
@@ -198,6 +202,7 @@ def _row_json(row: FrontierRow, pareto: ParetoStatus) -> dict[str, JsonValue]:
         "intervals": _intervals_json(row.intervals),
         "low_sample": row.low_sample,
         "insufficient_sample": row.insufficient_sample,
+        "pass_estimate_insufficient_sample": row.pass_insufficient_sample,
         "pareto": pareto,
     }
 
@@ -248,6 +253,7 @@ def frontier_to_jsonable(
                     "profit_factor": value_to_jsonable(r.profit_factor),
                     "pass_probability": value_to_jsonable(r.pass_probability),
                     "low_sample": r.low_sample,
+                    "pass_estimate_insufficient_sample": r.pass_insufficient_sample,
                 }
                 for r in met
             ],

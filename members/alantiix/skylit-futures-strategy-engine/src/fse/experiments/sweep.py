@@ -326,6 +326,7 @@ def _row(point: SweepPoint, outcome: ConfigOutcome) -> FrontierRow:
         intervals=None if r is None else r.intervals,
         low_sample=False if m is None else m.low_sample,
         insufficient_sample=outcome.insufficient_sample,
+        pass_insufficient_sample=False if r is None else r.pass_estimate.insufficient_sample,
     )
 
 

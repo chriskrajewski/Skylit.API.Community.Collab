@@ -66,6 +66,7 @@ __all__ = [
     "excursions_csv",
     "load_run",
     "report_jsonable",
+    "run_header",
     "trade_from_jsonable",
 ]
 
@@ -294,7 +295,8 @@ def _dates(values: Iterable[str]) -> tuple[date, ...]:
     return tuple(date.fromisoformat(v) for v in values)
 
 
-def _header(run: RunData, trade_count: int) -> Header:
+def run_header(run: RunData, trade_count: int) -> Header:
+    """The Req 20.15 header values of ``run`` with ``trade_count`` accepted trades."""
     m, inputs = run.manifest, run.inputs
     evaluated = _dates(m["sessions_evaluated"])
     fills = inputs["fills"]
@@ -363,7 +365,7 @@ def build_report(run: RunData) -> RunReport:
             a["gatekeeper_either"],
         )  # fmt: skip
         return RunReport(
-            header=_header(run, metrics.trade_count),
+            header=run_header(run, metrics.trade_count),
             metrics=metrics,
             funnel=run.funnel,
             agreement=agreement,

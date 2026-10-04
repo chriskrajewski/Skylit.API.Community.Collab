@@ -984,6 +984,7 @@ def run_backtest(
     code_version: str | None = None,
     shadow_mode: ShadowMode = "rejected",
     only_sessions: Collection[date] | None = None,
+    bootstrap_resamples: int | None = None,
 ) -> BacktestResult:
     """Run ``cfg`` over every session of ``sessions`` from ``cache`` (see the module notes).
 
@@ -1003,6 +1004,9 @@ def run_backtest(
     - ``clock`` and ``code_version``: for the Run_Manifest only.
     - ``shadow_mode``: :class:`~fse.backtest.shadow.ShadowBook` mode; tests
       only change it.
+    - ``bootstrap_resamples``: the bootstrap resample count (default
+      ``reporting.bootstrap_resamples``); a frontier sweep passes its own
+      count so each configuration's intervals are drawn once.
 
     Raises :class:`BacktestInputError` or :class:`~fse.calendars.CalendarError`
     (exit 2) before any Decision_Time and before any output file. After that,
@@ -1127,7 +1131,11 @@ def run_backtest(
             trades,
             metrics_cfg(cfg),
             seed=resolved_seed,
-            resamples=cfg.reporting.bootstrap_resamples,
+            resamples=(
+                cfg.reporting.bootstrap_resamples
+                if bootstrap_resamples is None
+                else bootstrap_resamples
+            ),
         )
         rec.record_bootstrap(intervals)
         inputs = _report_inputs(cfg, instruments, enabled, holdout, evaluated, loop, intervals)

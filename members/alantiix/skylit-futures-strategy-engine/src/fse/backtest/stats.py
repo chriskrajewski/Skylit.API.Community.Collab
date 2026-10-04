@@ -80,24 +80,25 @@ def _labelled(snapshot: Snapshot, label: str) -> set[float]:
 
 
 def node_agreement(snapshots: Iterable[Snapshot], params: NodeParams) -> NodeAgreement:
-    """The agreement counts of ``snapshots``; each Snapshot counts once."""
-    total = NodeAgreement()
+    """The agreement counts of ``snapshots``; each Snapshot counts once.
+
+    Counted with plain ints; only labelled Snapshots are classified.
+    """
+    compared = without = king_agree = both = either = 0
     for snapshot in snapshots:
         types = snapshot.node_types
-        if types is None or not any(t for t in types):
-            total += NodeAgreement(without_labels=1)
+        if types is None or not any(types):
+            without += 1
             continue
         labels = classify(snapshot, params)
         kings = _labelled(snapshot, _KING)
         theirs = _labelled(snapshot, _GATEKEEPER)
         ours = set(labels.gatekeepers)
-        total += NodeAgreement(
-            compared=1,
-            king_agree=int(labels.king is not None and labels.king in kings),
-            gatekeeper_both=len(ours & theirs),
-            gatekeeper_either=len(ours | theirs),
-        )
-    return total
+        compared += 1
+        king_agree += int(labels.king is not None and labels.king in kings)
+        both += len(ours & theirs)
+        either += len(ours | theirs)
+    return NodeAgreement(compared, without, king_agree, both, either)
 
 
 @dataclass(frozen=True, slots=True)

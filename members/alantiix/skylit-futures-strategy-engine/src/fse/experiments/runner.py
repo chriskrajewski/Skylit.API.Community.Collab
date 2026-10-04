@@ -62,7 +62,7 @@ from datetime import date
 from pathlib import Path
 from typing import ClassVar, Final, Literal
 
-from fse.analytics.bootstrap import BootstrapIntervals, bootstrap_intervals
+from fse.analytics.bootstrap import BootstrapIntervals
 from fse.analytics.metrics import Metrics, metrics_to_jsonable, summarize
 from fse.analytics.montecarlo import (
     PassEstimate,
@@ -289,17 +289,12 @@ def backtest_evaluator(task: EvalTask, writer: LogWriter) -> ConfigResult:
             calendar_dir=task.calendar_dir,
             code_version=task.code_version,
             only_sessions=task.only_sessions,
+            bootstrap_resamples=task.bootstrap_resamples,
         )
     sessions = bt.manifest.sessions_evaluated
-    mcfg = metrics_cfg(task.cfg)
-    metrics = summarize(bt.trades, sessions, mcfg)
-    intervals = (
-        None
-        if task.bootstrap_resamples is None
-        else bootstrap_intervals(
-            bt.trades, mcfg, seed=task.seed, resamples=task.bootstrap_resamples
-        )
-    )
+    metrics = summarize(bt.trades, sessions, metrics_cfg(task.cfg))
+    # The backtest drew them with the task's seed and resample count: one draw per config.
+    intervals = None if task.bootstrap_resamples is None else bt.intervals
     mc = run_pass_estimate(
         bt.run_dir,
         task.cfg,

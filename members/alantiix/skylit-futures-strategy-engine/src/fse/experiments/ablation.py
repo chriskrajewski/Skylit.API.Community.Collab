@@ -63,6 +63,7 @@ __all__ = [
     "ablation_rows",
     "ablation_to_jsonable",
     "metric_value",
+    "pass_insufficient",
     "run_ablation",
     "variant_name",
 ]
@@ -176,6 +177,11 @@ def _value_json(value: AblationValue) -> JsonValue:
     return str(round_fraction(value, _PLACES))
 
 
+def pass_insufficient(outcome: ConfigOutcome) -> bool:
+    """Whether the outcome's pass estimate is labeled "insufficient sample" (Req 21.11)."""
+    return outcome.result is not None and outcome.result.pass_estimate.insufficient_sample
+
+
 def ablation_to_jsonable(result: ExperimentResult) -> dict[str, JsonValue]:
     """``ablation.json``: the base, then per variant its status and metric cells."""
     base = result.outcomes[0]
@@ -186,6 +192,7 @@ def ablation_to_jsonable(result: ExperimentResult) -> dict[str, JsonValue]:
             "status": base.status,
             "error": base.error,
             "insufficient_sample": base.insufficient_sample,
+            "pass_estimate_insufficient_sample": pass_insufficient(base),
         },
         "metrics": list(ABLATION_METRICS),
         "distinct_configurations": result.distinct_configurations,
@@ -197,6 +204,7 @@ def ablation_to_jsonable(result: ExperimentResult) -> dict[str, JsonValue]:
                 "status": row.status,
                 "error": row.error,
                 "insufficient_sample": row.insufficient_sample,
+                "pass_estimate_insufficient_sample": pass_insufficient(outcome),
                 "cells": {
                     m: {
                         "base": _value_json(c.base),
@@ -206,7 +214,7 @@ def ablation_to_jsonable(result: ExperimentResult) -> dict[str, JsonValue]:
                     for m, c in row.cells.items()
                 },
             }
-            for row in ablation_rows(result)
+            for row, outcome in zip(ablation_rows(result), result.outcomes[1:], strict=True)
         ],
     }
 

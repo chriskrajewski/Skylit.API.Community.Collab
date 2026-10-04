@@ -112,6 +112,7 @@ __all__ = [
     "estimate",
     "estimate_to_jsonable",
     "load_run_outcomes",
+    "pass_estimate_run_id",
     "resolve_seed",
     "run_pass_estimate",
     "simulate_paths",
@@ -299,6 +300,11 @@ class _Table:
 
 def _table(outcomes: Sequence[SessionOutcome], acct: AccountConfig) -> _Table:
     for o in outcomes:
+        if not (o.net.is_finite() and o.intraday_low.is_finite()):
+            raise MonteCarloError(
+                f"session {o.session}: the net {o.net} and intraday low {o.intraday_low} "
+                "must be finite"
+            )
         if o.intraday_low > 0 or o.intraday_low > o.net:
             raise MonteCarloError(
                 f"session {o.session}: the intraday low {o.intraday_low} is above 0 or above "
@@ -479,10 +485,13 @@ def _outcome(obj: object) -> SessionOutcome:
     truncated = obj["truncated_by_run_account"]
     if not isinstance(truncated, bool):
         raise TypeError("truncated_by_run_account must be true or false")
+    net, low = Decimal(obj["net"]), Decimal(obj["intraday_low"])
+    if not (net.is_finite() and low.is_finite()):
+        raise ValueError(f"net {obj['net']!r} and intraday low {obj['intraday_low']!r}: not finite")
     return SessionOutcome(
         session=date.fromisoformat(obj["session"]),
-        net=Decimal(obj["net"]),
-        intraday_low=Decimal(obj["intraday_low"]),
+        net=net,
+        intraday_low=low,
         truncated_by_run_account=truncated,
     )
 
@@ -514,7 +523,10 @@ def load_run_outcomes(run_dir: Path) -> RunOutcomes:
     return RunOutcomes(run_dir, run_id, cfg_hash, data_range, outcomes)
 
 
-def _run_id(source: str, paths: int, max_days: int, min_sessions: int, seed: int) -> str:
+def pass_estimate_run_id(
+    source: str, paths: int, max_days: int, min_sessions: int, seed: int
+) -> str:
+    """The run id of a pass estimate: ``mc-`` and a hash of its source run, settings and seed."""
     text = f"{source}|{paths}|{max_days}|{min_sessions}|{seed}"
     return f"mc-{hashlib.sha256(text.encode()).hexdigest()[:_RUN_ID_HEX]}"
 
@@ -535,7 +547,8 @@ def run_pass_estimate(
     ``cfg`` must be the run's Strategy_Config (its config hash is checked);
     its ``account`` section sets the rules and ``experiments.montecarlo`` the
     path count, maximum trading days and minimum sessions. Every check runs
-    before anything is written.
+    before anything is written: the settings, the seed, the session values and
+    an ``out_dir`` that already holds a pass estimate or Run_Manifest.
     """
     source = load_run_outcomes(run_dir)
     mc = cfg.experiments.montecarlo
@@ -548,7 +561,14 @@ def run_pass_estimate(
             f"the Strategy_Config (hash {cfg_hash}) is not the run's (hash {source.config_hash})"
         )
     used = resolve_seed(seed)
-    run_id = _run_id(source.run_id, mc.paths, mc.max_days, mc.min_sessions, used)
+    _table(source.outcomes, cfg.account)  # the session values, before the manifest opens
+    taken = [n for n in (PASS_ESTIMATE_FILE_NAME, MANIFEST_FILE_NAME) if (out_dir / n).exists()]
+    if taken:
+        raise MonteCarloError(
+            f"the pass-estimate directory {out_dir} already holds {', '.join(taken)}; "
+            "use a new directory"
+        )
+    run_id = pass_estimate_run_id(source.run_id, mc.paths, mc.max_days, mc.min_sessions, used)
     spec = RunSpec(
         run_id=run_id,
         kind=MONTECARLO_KIND,

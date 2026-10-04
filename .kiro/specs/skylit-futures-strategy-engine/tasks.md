@@ -863,8 +863,8 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
     - **Property 54: Cadence comparison**
     - **Validates: Requirements 18.8, 18.10**
 
-- [ ] 28. Experiment commands, reports and performance
-  - [ ] 28.1 Wire `fse experiment` and the experiment reports
+- [x] 28. Experiment commands, reports and performance
+  - [x] 28.1 Wire `fse experiment` and the experiment reports
     - `src/fse/commands/experiment.py`: `fse experiment {ablation,sweep,montecarlo,holdout,walkforward,cadence}`
     - Extend `src/fse/reports/markdown.py` with Markdown plus CSV or JSON output for:
       - the ablation table
@@ -875,7 +875,7 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
       - holdout results
     - _Requirements: 18.10, 19.14, 20.9, 20.10, 20.11, 21.6, 21.7, 21.11, 22.5, 22.14, 22.15_
 
-  - [ ] 28.2 Write the backtest performance test
+  - [x] 28.2 Write the backtest performance test
     - `tests/perf/test_backtest_budget.py` (marker `perf`, run manually): run the Playbook_Baseline, with fake cost overlays, on a synthetic 250-session cache at 60 s cadence. The Run_Manifest must be written within 10 minutes
     - _Requirements: 18.12_
 
