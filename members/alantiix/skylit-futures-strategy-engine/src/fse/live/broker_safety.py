@@ -19,7 +19,10 @@ order the Project sent back to the Strategy_Engine's order ids.
 next sync its client id is looked up first; the order is sent again (same
 client id) only when the lookup succeeds and finds no working or filled
 order. A lookup that fails or takes longer than ``live.lookup_timeout_s``
-skips that cycle.
+skips that cycle. A market exit or close is resent cut to the broker's open
+quantity on its closing side at that sync, and dropped (logged
+``resubmit_dropped``) when nothing is left to close, so a resend can never
+open a reverse position.
 
 **After a fill** (Req 24.8-24.10). When the broker reports a Project entry
 filled, its bracket legs (the one untagged stop and the one untagged limit on
@@ -152,6 +155,13 @@ def _sign(side: Side) -> int:
 
 def _closing(position: int) -> Side:
     return "sell" if position > 0 else "buy"
+
+
+def _closable(position: int, side: Side) -> int:
+    """How much of ``position`` an order on ``side`` closes without reversing it."""
+    if position == 0 or side != _closing(position):
+        return 0
+    return abs(position)
 
 
 # ---------------------------------------------------------------- journal and ids
@@ -1098,8 +1108,14 @@ class BrokerSafety:
         return None
 
     async def _resubmit(self) -> None:
-        """Look up each pending send; resend only when nothing is found (Req 24.14-24.15)."""
+        """Look up each pending send; resend only when nothing is found (Req 24.14-24.15).
+
+        A market exit or close is cut to the open quantity on its closing side,
+        counting the resends before it in this pass as filled, and dropped when
+        nothing is left to close.
+        """
         timeout_s = self._live.lookup_timeout_s
+        positions = {i: s.position for i, s in (self.states or {}).items()}
         for cid, p in list(self.pending.items()):
             if self.outage is not None:
                 return
@@ -1128,6 +1144,22 @@ class BrokerSafety:
                 result = await self.adapter.place_bracketed(p.request)
                 self.requests.append("place_bracketed")
             else:
+                if p.request.kind == "market":
+                    held = positions.get(p.instrument, 0)
+                    qty = min(p.request.qty, _closable(held, p.request.side))
+                    if qty == 0:
+                        del self.pending[cid]
+                        self._log(
+                            {
+                                "event": "resubmit_dropped",
+                                "client_id": cid,
+                                "position": describe_position(held),
+                            }
+                        )
+                        continue
+                    if qty != p.request.qty:
+                        p.request = replace(p.request, qty=qty)
+                    positions[p.instrument] = held + _sign(p.request.side) * qty
                 result = await self.adapter.place(p.request)
                 self.requests.append("place")
             self._log({"event": "resubmitted", "client_id": cid, "outcome": result.outcome})

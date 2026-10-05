@@ -94,6 +94,8 @@ Run these from this folder with the virtual environment active. Dates are New Yo
    fse paper --config configs/playbook_baseline.yaml
    ```
 
+   The shipped config exits 2 until the Operator sets the commission and exchange fee per instrument and `regime.min_abs_value`.
+
 5. Before each commit, check that no tracked file holds a secret value:
 
    ```sh

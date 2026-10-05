@@ -1112,7 +1112,7 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
       - no credential arguments in the CLI
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.12, 1.17, 15.19, 15.20, 24.7, 24.28_
 
-- [ ] 38. Final checkpoint - Ensure all tests pass
+- [x] 38. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
   - Operator: run `fse scan-secrets`. No task enables Practice or Combine Order_Mode. Before any broker orders, work through the design's "Practice checklist before Combine Order_Mode".
 

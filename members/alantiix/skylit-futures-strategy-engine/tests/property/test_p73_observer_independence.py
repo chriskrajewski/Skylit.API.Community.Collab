@@ -24,7 +24,8 @@ runs on a fake clock that follows the Decision_Times.
 
 Checked: every intent the Paper_Broker receives, tagged with the number of
 Decision_Times done when it arrived, and every Decision_Time, are the same in
-both runs.
+both runs. Also checked: ``notifier.jsonl`` holds one ``delivery_failed`` entry
+per delivered message when the webhook fails or times out, and none otherwise.
 
 **Validates: Requirements 23.10, 25.14, 25.15**
 """
@@ -32,6 +33,7 @@ both runs.
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -48,7 +50,12 @@ from fse.config.schema import StrategyConfig
 from fse.engine.planner import OrderIntent
 from fse.live.levels_compare import LEVELS_TIMEOUT_S, LevelsCompare
 from fse.live.runner import LiveDecision, LiveSession
-from fse.notify.notifier import DELIVERY_TIMEOUT_S, WEBHOOK_ENV, Notifier
+from fse.notify.notifier import (
+    DELIVERY_TIMEOUT_S,
+    NOTIFIER_LOG_FILE_NAME,
+    WEBHOOK_ENV,
+    Notifier,
+)
 from fse.pit.market_view import heatmap_view
 from fse.secrets.env import EnvView
 from fse.sim.paper_broker import PaperBroker
@@ -166,10 +173,26 @@ def _routes(router: respx.MockRouter, clock: FakeClock, obs: Observers) -> None:
 type Routed = list[tuple[int, list[OrderIntent]]]
 
 
+@dataclass(frozen=True, slots=True)
+class Delivery:
+    """The kinds of the messages delivered, and each ``delivery_failed`` (sink, kind) logged."""
+
+    kinds: list[str]
+    failed: list[tuple[str, str]]
+
+
+def _delivery(notifier: Notifier, out_dir: Path) -> Delivery:
+    log = out_dir / NOTIFIER_LOG_FILE_NAME
+    lines = log.read_text(encoding="utf-8").splitlines() if log.exists() else []
+    entries = [json.loads(line) for line in lines]
+    failed = [(e["sink"], e["message"]) for e in entries if e["event"] == "delivery_failed"]
+    return Delivery([m.kind for m in notifier.sent], failed)
+
+
 def _run(
     root: Path, market: MarketInputs, cfg: StrategyConfig, plan: LivePlan, obs: Observers | None
-) -> tuple[Routed, list[Instant | None]]:
-    """The Paper_Broker's intents (tagged) and the Decision_Times of one run."""
+) -> tuple[Routed, list[Instant | None], Delivery]:
+    """The Paper_Broker's intents (tagged), the Decision_Times and the deliveries of one run."""
     driver = Driver(root, market, cfg)
     clock = FakeClock(0)
     env = EnvView({WEBHOOK_ENV: WEBHOOK_URL}, {})
@@ -223,7 +246,7 @@ def _run(
             loop.run_until_complete(notifier.aclose())
     finally:
         loop.close()
-    return routed, times
+    return routed, times, _delivery(notifier, root / "notify")
 
 
 # Feature: skylit-futures-strategy-engine, Property 73: Observer independence
@@ -239,9 +262,16 @@ def test_orders_are_the_same_whatever_the_narrator_notifier_and_levels_do(
     plan = LivePlan(plan.seed, 300, plan.max_delay_s, plan.outage, 0.02, ())
     with TemporaryDirectory(prefix="fse-p73-") as tmp:
         root = Path(tmp)
-        base = _run(root / "base", market, _with_notify(cfg, None), plan, None)
-        seen = _run(root / "observed", market, _with_notify(cfg, obs), plan, obs)
-    assert seen == base
-    routed, _times = base
+        routed, times, base_delivery = _run(
+            root / "base", market, _with_notify(cfg, None), plan, None
+        )
+        seen_routed, seen_times, delivery = _run(
+            root / "observed", market, _with_notify(cfg, obs), plan, obs
+        )
+    assert (seen_routed, seen_times) == (routed, times)
+    # Each failed or late webhook delivery is logged as delivery_failed (Req 25.14).
+    assert base_delivery.failed == []
+    webhook_fails = obs.webhook in ("http_error", "network_error", "timeout")
+    assert delivery.failed == ([("webhook", k) for k in delivery.kinds] if webhook_fails else [])
     event(f"narrator: {obs.narrator}; webhook: {obs.webhook}; levels: {obs.levels}")
     event(f"intents routed: {'some' if any(i for _, i in routed) else 'none'}")

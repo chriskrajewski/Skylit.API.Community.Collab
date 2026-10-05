@@ -330,7 +330,7 @@
     },
     "35.7 Write property test for client-id uniqueness": {
       "status": "passed",
-      "lastRunTimestamp": 1791173482596
+      "lastRunTimestamp": 1791178627192
     },
     "35.8 Write property test for reconciliation": {
       "status": "passed",
@@ -342,7 +342,7 @@
     },
     "36.3 Write property test for observer independence": {
       "status": "passed",
-      "lastRunTimestamp": 1791176058070
+      "lastRunTimestamp": 1791178627192
     }
   },
   "executionHistory": {
