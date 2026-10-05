@@ -24,6 +24,7 @@
 | Member | Projects |
 | --- | --- |
 | [alantiix](alantiix/README.md) | [skylit-academy-playbook-skill](alantiix/skylit-academy-playbook-skill/README.md) · [skylit-knowledgebase](alantiix/skylit-knowledgebase/README.md) |
+| [raked](raked/README.md) | [mnq-gamma-node](raked/mnq-gamma-node/README.md) |
 
 ## How this is organized
 
