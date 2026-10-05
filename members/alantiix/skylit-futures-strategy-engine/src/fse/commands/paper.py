@@ -25,6 +25,8 @@ import argparse
 import asyncio
 import random
 import secrets
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 from typing import ClassVar, Final
@@ -45,6 +47,8 @@ from fse.data.path_guard import check_output_dirs
 from fse.data.vix import prior_session
 from fse.engine.step import Engine, EngineParams
 from fse.live.bar_feed import FeedInstrument
+from fse.live.broker_safety import BrokerSafety
+from fse.live.order_router import ModeDecision
 from fse.live.recorder import RECORDINGS_DIR_NAME
 from fse.live.runner import (
     LiveClients,
@@ -64,7 +68,17 @@ from fse.skylit.client import ClientConfig, SkylitClient
 from fse.skylit.fetch_log import FETCH_LOG_FILE_NAME, FetchLog
 from fse.timekit import SessionTimes, ny_datetime
 
-__all__ = ["NAME", "PaperUsageError", "register", "run_paper_command"]
+__all__ = [
+    "NAME",
+    "BrokerSetup",
+    "PaperUsageError",
+    "Prepared",
+    "add_live_arguments",
+    "prepare",
+    "register",
+    "run_live",
+    "run_paper_command",
+]
 
 NAME: Final = "paper"
 EXIT_INVALID_INPUT: Final = 2
@@ -112,6 +126,12 @@ def register(subparsers: SubParsers) -> None:
         epilog=_EPILOG,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
+    add_live_arguments(parser)
+    parser.set_defaults(handler=run_paper_command)
+
+
+def add_live_arguments(parser: argparse.ArgumentParser) -> None:
+    """``--config`` and the directory flags ``fse paper`` and ``fse live`` share."""
     parser.add_argument("--config", required=True, type=Path, metavar="FILE")
     for flag, default in (
         ("--cache-dir", "~/.skylit-fse/cache"),
@@ -121,10 +141,42 @@ def register(subparsers: SubParsers) -> None:
         ("--out", "~/.skylit-fse/runs/live-<session>-<id>"),
     ):
         parser.add_argument(flag, type=Path, metavar="DIR", help=f"default: {default}")
-    parser.set_defaults(handler=run_paper_command)
+
+
+@dataclass(frozen=True, slots=True)
+class Prepared:
+    """Everything a live run needs, checked before any request is sent."""
+
+    cfg: StrategyConfig
+    engine: Engine
+    session: date
+    calendars: Calendars
+    out_dir: Path
+    dirs: dict[str, Path]
+    notes: list[str]
+    feeds: tuple[FeedInstrument, ...]
+    vix: tuple[VixDailyRecord | None, VixDailyRecord | None]
+
+
+type BrokerSetup = Callable[
+    [Prepared, ProjectXSession, SystemClock],
+    Awaitable[tuple[ModeDecision | None, BrokerSafety | None]],
+]
+"""Resolves the Order_Mode for ``fse live``: the decision and its BrokerSafety (or ``None``)."""
 
 
 def run_paper_command(args: argparse.Namespace, ctx: CommandContext) -> int:
+    prep = prepare(args, ctx)
+    if prep.cfg.order_mode != "paper":
+        prep.notes.append(
+            f"fse paper runs in Paper Order_Mode; the config's order_mode {prep.cfg.order_mode} "
+            "is not used"
+        )
+    return run_live(ctx, prep, None)
+
+
+def prepare(args: argparse.Namespace, ctx: CommandContext) -> Prepared:
+    """Load and check the config, the credentials, the calendars and the directories."""
     writer = ctx.writer
     cfg = load_config(args.config, writer)
     check_refresh_interval(cfg)
@@ -166,12 +218,6 @@ def run_paper_command(args: argparse.Namespace, ctx: CommandContext) -> int:
         }
     )
     out_dir = dirs["live run directory"]
-    notes: list[str] = []
-    if cfg.order_mode != "paper":
-        notes.append(
-            f"fse paper runs in Paper Order_Mode; the config's order_mode {cfg.order_mode} "
-            "is not used"
-        )
     view_id = heatmap_view(cfg.data.heatmap_view).view_id()
     with DataCache(dirs["cache directory"], calendar=calendar) as cache:
         medians = RegimeMedianStore(cache).load_or_build(
@@ -180,22 +226,17 @@ def run_paper_command(args: argparse.Namespace, ctx: CommandContext) -> int:
         daily = cache.vix.read_daily()
     prior = prior_session(calendar, session)
     engine = Engine(params, calendar, medians.by_session)
-    writer.echo(f"fse paper {session}: run directory {out_dir}")
+    vix = (daily.get(session), None if prior is None else daily.get(prior))
+    return Prepared(cfg, engine, session, calendars, out_dir, dirs, [], feeds, vix)
+
+
+def run_live(ctx: CommandContext, prep: Prepared, broker: BrokerSetup | None) -> int:
+    """Run the prepared session; ``broker`` (``fse live`` only) resolves the Order_Mode."""
+    writer = ctx.writer
+    command = NAME if broker is None else "live"
+    writer.echo(f"fse {command} {prep.session}: run directory {prep.out_dir}")
     try:
-        return asyncio.run(
-            _run(
-                ctx,
-                cfg,
-                engine,
-                session,
-                calendars,
-                out_dir,
-                dirs,
-                notes,
-                feeds,
-                (daily.get(session), None if prior is None else daily.get(prior)),
-            )
-        )
+        return asyncio.run(_run(ctx, prep, broker))
     except LiveStartError:
         raise
     except asyncio.CancelledError:
@@ -203,29 +244,27 @@ def run_paper_command(args: argparse.Namespace, ctx: CommandContext) -> int:
         return 130
 
 
-async def _run(
-    ctx: CommandContext,
-    cfg: StrategyConfig,
-    engine: Engine,
-    session: date,
-    calendars: Calendars,
-    out_dir: Path,
-    dirs: dict[str, Path],
-    notes: list[str],
-    feeds: tuple[FeedInstrument, ...],
-    vix: tuple[VixDailyRecord | None, VixDailyRecord | None],
-) -> int:
+async def _run(ctx: CommandContext, prep: Prepared, broker: BrokerSetup | None) -> int:
+    cfg, session, calendars, out_dir, dirs = (
+        prep.cfg,
+        prep.session,
+        prep.calendars,
+        prep.out_dir,
+        prep.dirs,
+    )
     clock = SystemClock()
     rng = random.Random()
     writer = ctx.writer
     async with httpx.AsyncClient(follow_redirects=False) as http:
         with FetchLog(writer, out_dir / FETCH_LOG_FILE_NAME) as fetch_log:
             skylit = SkylitClient(ctx.env, ClientConfig(), fetch_log, clock, rng, http=http)
-            px = ProjectXBars(ProjectXSession(ctx.env, writer.redactor, http, clock), clock, rng)
+            px_session = ProjectXSession(ctx.env, writer.redactor, http, clock)
+            px = ProjectXBars(px_session, clock, rng)
+            mode, safety = (None, None) if broker is None else await broker(prep, px_session, clock)
             notifier = Notifier(cfg.notify, ctx.env, writer, clock, out_dir, http=http)
             live = LiveSession(
                 cfg=cfg,
-                engine=engine,
+                engine=prep.engine,
                 calendar=calendars.exchange.sessions,
                 session=session,
                 writer=writer,
@@ -236,13 +275,15 @@ async def _run(
                 events=[
                     e for e in calendars.events.events if abs((e.release_date - session).days) <= 1
                 ],
-                vix_daily=vix,
-                notes=notes,
+                vix_daily=prep.vix,
+                notes=prep.notes,
+                mode=mode,
+                safety=safety,
             )
             runner = LiveRunner(
                 live,
                 LiveClients(
-                    map=skylit, bars=px, instruments=feeds, levels=skylit, dark_pool=skylit
+                    map=skylit, bars=px, instruments=prep.feeds, levels=skylit, dark_pool=skylit
                 ),
                 clock,
                 notifier,

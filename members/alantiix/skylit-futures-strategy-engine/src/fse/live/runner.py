@@ -46,6 +46,17 @@ handled by one Decision_Time. At Decision_Time ``t`` (:meth:`LiveSession.decide`
    in its own task, so a pending delivery never delays a Decision_Time
    (Req 23.11, 25.13-25.14).
 
+**Practice and Combine** (Req 24, :mod:`fse.live.broker_safety`). With a
+:class:`~fse.live.order_router.ModeDecision` for a broker mode and a
+:class:`~fse.live.broker_safety.BrokerSafety`, the session's broker is a
+:class:`~fse.live.order_router.MirrorBroker` bound to the mode's account:
+the Risk_Manager pre-check and the ignored-instrument rule run as each intent
+is routed, and after each Decision_Time the session queues the routed broker
+actions and its book for the safety task, which sends them, reads the broker,
+confirms stops and reconciles. Its blocks join the guards; its notes go in
+the next Finding_Card, which is then sent whatever the schedule. A failed
+Order_Mode condition is named in the first Finding_Card (Req 24.3, 24.6).
+
 **Restart** (Req 16.7, 16.10). The saved EngineState and paper state are
 restored. In the same session, the session's recording is read back into
 the ring buffers, and the bars received after the saved Decision_Time go
@@ -82,12 +93,20 @@ from fse.engine.taps import BASE_INTERVAL_S
 from fse.engine.types import Bar, DarkPoolPrint, EconomicEvent, Snapshot
 from fse.live._wait import FeedLog, within
 from fse.live.bar_feed import DEFAULT_POLL_INTERVAL_S, BarFeed, BarRetriever, FeedInstrument
+from fse.live.broker_safety import BrokerSafety, Expectation
 from fse.live.darkpool_feed import DEFAULT_INTERVAL_S as DARK_POOL_INTERVAL_S
 from fse.live.darkpool_feed import DarkPoolFeed, feed_tickers
 from fse.live.guards import STALE_MAP_BLOCK, Guards, StaleMapGuard
 from fse.live.levels_compare import LevelsClient, LevelsCompare, compare_active
 from fse.live.map_feed import REFRESH_TIMEOUT_S, MapClient, MapFeed
-from fse.live.order_router import Routing, paper_routing
+from fse.live.order_router import (
+    BROKER_MODES,
+    MirrorBroker,
+    ModeDecision,
+    Routing,
+    broker_routing,
+    paper_routing,
+)
 from fse.live.recorder import (
     Recorder,
     RecordingError,
@@ -314,6 +333,8 @@ class LiveSession:
         adapter: object | None = None,
         notes: Iterable[str] = (),
         perf_ns: Callable[[], int] = time.perf_counter_ns,
+        mode: ModeDecision | None = None,
+        safety: BrokerSafety | None = None,
     ) -> None:
         self._cfg = cfg
         self._engine = engine
@@ -329,6 +350,10 @@ class LiveSession:
         self._adapter = adapter
         self._start_notes = list(notes)
         self._perf_ns = perf_ns
+        self._mode = mode
+        self._safety = safety if mode is not None and mode.mode in BROKER_MODES else None
+        if mode is not None and mode.mode in BROKER_MODES and safety is None:
+            raise ValueError(f"Order_Mode {mode.mode} needs a BrokerSafety")
         self.window = session_window(cfg, calendar, session)
         self._instruments = engine.params.instruments
         self._symbols = tuple(cfg.data.symbols)
@@ -416,25 +441,28 @@ class LiveSession:
         restore = self._restore()
         cfg = self._cfg
         fees = trading_fees(cfg, self._instruments)
+        kind = PaperBroker if self._safety is None else MirrorBroker
         account = AccountSim(cfg.account, self._calendar, fees)
-        broker = PaperBroker(cfg.fills, account)
+        broker = kind(cfg.fills, account)
         resume_bars: list[Bar] | None = None
         if restore.failure is None and restore.paper is not None:
             account = AccountSim.restore(
                 cfg.account, self._calendar, fees, restore.paper.broker.account
             )
-            broker = PaperBroker.restore(cfg.fills, account, restore.paper.broker)
+            broker = kind.restore(cfg.fills, account, restore.paper.broker)
             if restore.paper.session == self._session:
                 resume_bars = self._refill(restore)
         if restore.failure is not None:
             account = AccountSim(cfg.account, self._calendar, fees)
-            broker = PaperBroker(cfg.fills, account)
+            broker = kind(cfg.fills, account)
             resume_bars = None
             self.blocks.add(BlockRecord("restore_failed", None, restore.failure, now))
             self._notes.append(
                 f"restore failed: {restore.failure}; new entries are blocked until fse clear"
             )
-        self._routing = paper_routing(broker, self._adapter)
+        if self._mode is not None and self._mode.note is not None:
+            self._notes.append(self._mode.note)
+        self._routing = self._route(broker)
         self._run_dir.mkdir(parents=True, exist_ok=True)
         self._dlog = DecisionLog(self._writer, self.decision_log)
         loop = SessionLoop(cfg, self._engine, broker, self._calendar, self._dlog, "off")
@@ -468,6 +496,39 @@ class LiveSession:
         today, prior = self._vix_daily
         self.on_vix_daily(today, prior, now)
         self._opened = True
+
+    def _route(self, broker: PaperBroker) -> Routing:
+        safety, mode = self._safety, self._mode
+        if safety is None or mode is None:
+            return paper_routing(broker, self._adapter)
+        assert isinstance(broker, MirrorBroker)
+        cap = self._cfg.account.position_cap
+        broker.configure(
+            gate=safety,
+            ignored=self._cfg.live.ignored_instruments,
+            position_cap=cap.micro_equivalents if cap.enabled else None,
+            risk=lambda: self.loop.state.risk,
+            session=lambda: self.loop.session,
+            note=self.note,
+        )
+        safety.bind(broker, self.note, self.broker_event)
+        self.guards.add_source(safety.external_blocks)
+        return broker_routing(mode.mode, broker, safety.adapter)
+
+    @property
+    def safety(self) -> BrokerSafety | None:
+        return self._safety
+
+    def note(self, text: str) -> None:
+        """A line for the next Finding_Card, which is then sent whatever the schedule."""
+        self._notes.append(text)
+
+    def broker_event(self, entry: dict[str, JsonValue]) -> None:
+        """A broker event: to the live log and, while open, to the recording (Req 23.8)."""
+        self.log({"source": "broker", **entry})
+        at = entry.get("t")
+        if self._recorder is not None and isinstance(at, int):
+            self._recorder.broker_event(entry, self._received(at))
 
     def _restore(self) -> _Restore:
         out = _Restore()
@@ -623,6 +684,9 @@ class LiveSession:
         result = loop.advance(t, view, groups, blocks)
         latency = self._perf_ns() - started
         self._last_t = t
+        paper = self.routing.paper
+        if self._safety is not None and isinstance(paper, MirrorBroker):
+            self._safety.submit(t, paper.take_outbound(), Expectation.of(paper))
         rec.decision_time(t)
         self._save(t)
         self.latencies.append(latency)
@@ -658,7 +722,7 @@ class LiveSession:
         payload = result.payload
         self.ledger.record(payload)
         card: FindingCard | None = None
-        if self.schedule.due(payload.t, payload.cards):
+        if self._notes or self.schedule.due(payload.t, payload.cards):
             p = self._engine.params
             card = build_card(
                 payload,
@@ -820,10 +884,17 @@ class LiveRunner:
             f"code {self._code_version}, projected Skylit credits per session {total}"
         )
         notifier_task = asyncio.ensure_future(self._notifier.run())
+        safety = s.safety
+        if safety is not None:
+            await safety.start()  # contracts and the first comparison before any order
         tasks = {
             name: asyncio.ensure_future(self._guarded(name, work))
             for name, work in self._feeds(cfg)
         }
+        if safety is not None:
+            tasks["broker"] = asyncio.ensure_future(
+                self._guarded("broker", safety.run(s.window.dt_end))
+            )
         try:
             await self._premarket(cfg)
             await self._decisions(cfg.time.decision_cadence_s)

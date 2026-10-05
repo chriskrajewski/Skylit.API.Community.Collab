@@ -24,6 +24,21 @@ licensing restrictions):
 - Rate limits: https://gateway.docs.projectx.com/docs/getting-started/rate-limits/
   ``retrieveBars`` allows 50 requests per 30 seconds, every other endpoint 200
   per 60 seconds; over the limit the API answers HTTP 429.
+- Orders, positions, accounts and contracts (design §24):
+  https://gateway.docs.projectx.com/docs/api-reference/order/order-place/ and
+  the order modify, cancel, search and search-open pages, the open-position
+  search, the account search and the contract search pages. ``Order/place``
+  takes ``accountId``, ``contractId``, ``type`` (1 limit, 2 market, 4 stop),
+  ``side`` (0 bid = buy, 1 ask = sell), ``size``, ``limitPrice``,
+  ``stopPrice``, ``customTag`` (unique across the account) and the
+  ``stopLossBracket`` / ``takeProfitBracket`` objects ``{ticks, type}``, and
+  answers ``{orderId, success, errorCode, errorMessage}``. A bracket sent to
+  an account in Position Brackets mode is rejected with ``errorCode 2``; the
+  rejected order still gets an id. Order searches list ``{id, contractId,
+  status, type, side, size, limitPrice, stopPrice, fillVolume, filledPrice}``
+  and, on the order search page, ``customTag`` (OQ8: whether every search
+  returns it is not confirmed). Open positions list ``{contractId, type (1
+  long, 2 short), size, averagePrice}``.
 
 Parsing is hand-written rather than pydantic: a validation error must never
 echo an input value, and a login body holds the session token. Every error
@@ -52,17 +67,33 @@ __all__ = [
     "LOGIN_ERROR_NAMES",
     "MAX_BARS_PER_REQUEST",
     "TICKS_PER_POINT",
+    "WORKING_STATUSES",
+    "AccountRef",
+    "ApiResponse",
     "BarFetchFailure",
     "BarHistory",
     "BarUnit",
+    "ContractRef",
     "LoginResponse",
     "MalformedResponseError",
+    "OrderSide",
+    "OrderStatus",
+    "OrderType",
+    "PlaceResponse",
+    "PositionType",
     "RetrieveBarsRequest",
     "RetrieveBarsResponse",
     "WireBar",
+    "WireOrder",
+    "WirePosition",
     "bar_unit_for",
     "format_instant",
+    "parse_accounts",
+    "parse_contracts",
+    "parse_orders",
+    "parse_positions",
     "price_to_ticks",
+    "ticks_to_price",
     "to_bar",
 ]
 
@@ -135,6 +166,243 @@ def price_to_ticks(price: float) -> Ticks:
     if not math.isfinite(price):
         raise ValueError("a price must be a finite number")
     return math.floor(price * TICKS_PER_POINT + 0.5)
+
+
+def ticks_to_price(ticks: Ticks) -> float:
+    """The price of ``ticks`` 0.25-point ticks (exact in binary floating point)."""
+    return ticks / TICKS_PER_POINT
+
+
+# ---------------------------------------------------------------- orders and accounts
+
+
+class OrderType(IntEnum):
+    """``Order/place`` ``type`` values (also the bracket ``type``)."""
+
+    LIMIT = 1
+    MARKET = 2
+    STOP = 4
+    TRAILING_STOP = 5
+    JOIN_BID = 6
+    JOIN_ASK = 7
+
+
+class OrderSide(IntEnum):
+    """``Order/place`` ``side`` values."""
+
+    BID = 0  # buy
+    ASK = 1  # sell
+
+
+class OrderStatus(IntEnum):
+    """Order ``status`` values in the order searches."""
+
+    NONE = 0
+    OPEN = 1
+    FILLED = 2
+    CANCELLED = 3
+    EXPIRED = 4
+    REJECTED = 5
+    PENDING = 6
+
+
+WORKING_STATUSES: Final[frozenset[int]] = frozenset({OrderStatus.OPEN, OrderStatus.PENDING})
+"""Statuses of an order that can still fill."""
+
+
+class PositionType(IntEnum):
+    """Open-position ``type`` values."""
+
+    LONG = 1
+    SHORT = 2
+
+
+@dataclass(frozen=True, slots=True)
+class ApiResponse:
+    """The ``success`` and ``errorCode`` of any ProjectX answer."""
+
+    success: bool
+    error_code: int
+
+    @property
+    def ok(self) -> bool:
+        return self.success and self.error_code == 0
+
+    @classmethod
+    def parse(cls, body: object, where: str) -> ApiResponse:
+        if not isinstance(body, dict):
+            raise MalformedResponseError(f"the {where} response is not a JSON object")
+        return cls(
+            _bool_field(body, "success", f"the {where} response"),
+            _int_field(body, "errorCode", f"the {where} response"),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class PlaceResponse:
+    """A decoded ``Order/place`` answer; ``order_id`` is ``None`` when absent."""
+
+    order_id: int | None
+    success: bool
+    error_code: int
+
+    @classmethod
+    def parse(cls, body: object) -> PlaceResponse:
+        api = ApiResponse.parse(body, "Order/place")
+        assert isinstance(body, dict)
+        raw = body.get("orderId")
+        if raw is not None and (isinstance(raw, bool) or not isinstance(raw, int)):
+            raise MalformedResponseError("the Order/place response field 'orderId' is not an int")
+        return cls(raw, api.success, api.error_code)
+
+
+@dataclass(frozen=True, slots=True)
+class AccountRef:
+    """One account from ``Account/search``. ``name`` is never put in a Finding_Card."""
+
+    id: int
+    name: str
+    can_trade: bool
+
+
+@dataclass(frozen=True, slots=True)
+class ContractRef:
+    """One contract from ``Contract/search``."""
+
+    id: str
+    name: str
+    tick_size: float
+    active: bool
+    symbol_id: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class WireOrder:
+    """One order from an order search.
+
+    ``custom_tag`` is the ``customTag`` value (``None`` when null or absent);
+    ``tag_field`` says whether the answer had the field at all (OQ8).
+    """
+
+    id: int
+    contract_id: str
+    status: int
+    type: int
+    side: int
+    size: int
+    limit_price: float | None
+    stop_price: float | None
+    fill_volume: int | None
+    filled_price: float | None
+    custom_tag: str | None
+    tag_field: bool
+
+
+@dataclass(frozen=True, slots=True)
+class WirePosition:
+    """One open position from ``Position/searchOpen``."""
+
+    contract_id: str
+    type: int
+    size: int
+    average_price: float | None
+
+
+def parse_accounts(body: object) -> tuple[AccountRef, ...]:
+    """The accounts of an ``Account/search`` answer (``success`` checked by the caller)."""
+    items = _list_field(body, "accounts", "Account/search")
+    out: list[AccountRef] = []
+    for i, item in enumerate(items):
+        where = f"Account/search account {i}"
+        if not isinstance(item, dict):
+            raise MalformedResponseError(f"{where} is not a JSON object")
+        name = item.get("name")
+        out.append(
+            AccountRef(
+                _int_field(item, "id", where),
+                name if isinstance(name, str) else "",
+                _bool_field(item, "canTrade", where),
+            )
+        )
+    return tuple(out)
+
+
+def parse_contracts(body: object) -> tuple[ContractRef, ...]:
+    """The contracts of a ``Contract/search`` answer."""
+    items = _list_field(body, "contracts", "Contract/search")
+    out: list[ContractRef] = []
+    for i, item in enumerate(items):
+        where = f"Contract/search contract {i}"
+        if not isinstance(item, dict):
+            raise MalformedResponseError(f"{where} is not a JSON object")
+        cid, name, symbol = item.get("id"), item.get("name"), item.get("symbolId")
+        if not isinstance(cid, str) or not cid.strip():
+            raise MalformedResponseError(f"{where} field 'id' is not a string")
+        out.append(
+            ContractRef(
+                cid,
+                name if isinstance(name, str) else "",
+                _number_field(item, "tickSize", where),
+                _bool_field(item, "activeContract", where),
+                symbol if isinstance(symbol, str) else None,
+            )
+        )
+    return tuple(out)
+
+
+def parse_orders(body: object, where: str) -> tuple[WireOrder, ...]:
+    """The orders of an order-search answer."""
+    items = _list_field(body, "orders", where)
+    out: list[WireOrder] = []
+    for i, item in enumerate(items):
+        at = f"{where} order {i}"
+        if not isinstance(item, dict):
+            raise MalformedResponseError(f"{at} is not a JSON object")
+        contract = item.get("contractId")
+        if not isinstance(contract, str):
+            raise MalformedResponseError(f"{at} field 'contractId' is not a string")
+        tag = item.get("customTag")
+        if tag is not None and not isinstance(tag, str):
+            raise MalformedResponseError(f"{at} field 'customTag' is not a string")
+        out.append(
+            WireOrder(
+                id=_int_field(item, "id", at),
+                contract_id=contract,
+                status=_int_field(item, "status", at),
+                type=_int_field(item, "type", at),
+                side=_int_field(item, "side", at),
+                size=_int_field(item, "size", at),
+                limit_price=_optional_number(item, "limitPrice", at),
+                stop_price=_optional_number(item, "stopPrice", at),
+                fill_volume=_optional_int(item, "fillVolume", at),
+                filled_price=_optional_number(item, "filledPrice", at),
+                custom_tag=tag if tag else None,
+                tag_field="customTag" in item,
+            )
+        )
+    return tuple(out)
+
+
+def parse_positions(body: object) -> tuple[WirePosition, ...]:
+    """The open positions of a ``Position/searchOpen`` answer."""
+    items = _list_field(body, "positions", "Position/searchOpen")
+    out: list[WirePosition] = []
+    for i, item in enumerate(items):
+        at = f"Position/searchOpen position {i}"
+        if not isinstance(item, dict):
+            raise MalformedResponseError(f"{at} is not a JSON object")
+        contract = item.get("contractId")
+        if not isinstance(contract, str):
+            raise MalformedResponseError(f"{at} field 'contractId' is not a string")
+        out.append(
+            WirePosition(
+                contract,
+                _int_field(item, "type", at),
+                _int_field(item, "size", at),
+                _optional_number(item, "averagePrice", at),
+            )
+        )
+    return tuple(out)
 
 
 # ---------------------------------------------------------------- login
@@ -336,6 +604,23 @@ def _int_field(body: dict[str, object], name: str, where: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise MalformedResponseError(f"{where} field {name!r} is not an integer")
     return value
+
+
+def _list_field(body: object, name: str, where: str) -> list[object]:
+    if not isinstance(body, dict):
+        raise MalformedResponseError(f"the {where} response is not a JSON object")
+    value = body.get(name)
+    if not isinstance(value, list):
+        raise MalformedResponseError(f"the {where} response field {name!r} is not a list")
+    return value
+
+
+def _optional_number(body: dict[str, object], name: str, where: str) -> float | None:
+    return None if body.get(name) is None else _number_field(body, name, where)
+
+
+def _optional_int(body: dict[str, object], name: str, where: str) -> int | None:
+    return None if body.get(name) is None else _int_field(body, name, where)
 
 
 def _number_field(body: dict[str, object], name: str, where: str) -> float:

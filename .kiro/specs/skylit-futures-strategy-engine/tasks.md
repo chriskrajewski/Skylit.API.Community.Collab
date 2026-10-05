@@ -1014,8 +1014,8 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
   - Ensure all tests pass, ask the user if questions arise.
   - Operator (optional): run `fse paper --config configs/playbook_baseline.yaml` during RTH. Paper Order_Mode sends no broker orders.
 
-- [ ] 35. Broker_Adapter and order safety (ProjectX)
-  - [ ] 35.1 Implement the Broker_Adapter
+- [x] 35. Broker_Adapter and order safety (ProjectX)
+  - [x] 35.1 Implement the Broker_Adapter
     - `src/fse/projectx/broker.py`, extending `src/fse/projectx/models.py`:
       - `resolve_accounts` and `resolve_contract`
       - `place_bracketed`, using the design §24 payload
@@ -1024,7 +1024,7 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
       - spacing under 200 requests per 60 s
     - _Requirements: 24.7, 24.8, 24.13, 24.14, 24.15_
 
-  - [ ] 35.2 Implement Order_Mode resolution, routing and `fse live`
+  - [x] 35.2 Implement Order_Mode resolution, routing and `fse live`
     - Update `src/fse/live/order_router.py` and `src/fse/live/runner.py`:
       - Combine only when all three Combine_Opt_In conditions hold
       - Practice only when the practice id is set, resolved and different from `COMBINE_ACCOUNT_ID`
@@ -1035,7 +1035,7 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
     - `src/fse/commands/live.py`: `fse live --config [--live-orders]` honors `order_mode`; `fse paper` stays Paper-only
     - _Requirements: 24.1, 24.2, 24.3, 24.4, 24.5, 24.6, 24.20, 24.23, 24.24, 24.25_
 
-  - [ ] 35.3 Implement protective safety, reconciliation and outage handling
+  - [x] 35.3 Implement protective safety, reconciliation and outage handling
     - `src/fse/live/broker_safety.py`, wired through `src/fse/live/runner.py` and `src/fse/live/guards.py`:
       - stop confirmation within the configured time; on a bracket rejection or a missing stop, market-close the instrument and set a persistent block with a card
       - after a fill, modify the bracket legs to the planned prices, plus the TP1_Partial_BE resize and the TP2 order
@@ -1045,27 +1045,27 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
       - the outage block, lifted only after a clean reconciliation
     - _Requirements: 24.9, 24.10, 24.11, 24.12, 24.13, 24.16, 24.17, 24.18, 24.19, 24.21, 24.22_
 
-  - [ ] 35.4 Write property test for Order_Mode resolution and routing
+  - [x] 35.4 Write property test for Order_Mode resolution and routing
     - **Property 74: Order_Mode resolution and routing**
     - **Validates: Requirements 24.1, 24.3, 24.4, 24.5, 24.6**
 
-  - [ ] 35.5 Write property test for the bracket payload
+  - [x] 35.5 Write property test for the bracket payload
     - **Property 75: Bracket payload**
     - **Validates: Requirements 24.8**
 
-  - [ ] 35.6 Write property test for protective close and persistent blocks
+  - [x] 35.6 Write property test for protective close and persistent blocks
     - **Property 76: Protective close and persistent blocks**
     - **Validates: Requirements 24.9, 24.10, 24.27, 16.10**
 
-  - [ ] 35.7 Write property test for client-id uniqueness
+  - [x] 35.7 Write property test for client-id uniqueness
     - **Property 77: Client-id uniqueness and safe resubmission**
     - **Validates: Requirements 24.13, 24.14, 24.15**
 
-  - [ ] 35.8 Write property test for reconciliation
+  - [x] 35.8 Write property test for reconciliation
     - **Property 78: Reconciliation**
     - **Validates: Requirements 24.18, 24.19, 24.20**
 
-  - [ ] 35.9 Write integration tests for broker flows against mocked ProjectX
+  - [x] 35.9 Write integration tests for broker flows against mocked ProjectX
     - Use respx mocks with fake account and contract ids. Cover:
       - the opt-in matrix
       - bracket rejection with `errorCode 2` and a missing stop after a fill

@@ -15,6 +15,9 @@ order:
 3. **Persistent blocks** (Req 24.10, 24.18, 24.27, 16.10): each record in
    ``blocks.json``, as its kind; an unreadable blocks file gives a
    ``blocks_unreadable`` block.
+4. **Broker blocks** (Practice and Combine, :mod:`fse.live.broker_safety`):
+   not yet compared, an outage (Req 24.21) and a contract mismatch for the
+   session (Req 24.12).
 
 ``Engine.step`` cancels each resting entry of a blocked instrument and
 withholds new entries; stop-loss, target and exit orders of open positions
@@ -24,6 +27,7 @@ keep working. The Live_Runner records each Decision_Time's blocks as a
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -80,12 +84,23 @@ class StaleMapGuard:
 class Guards:
     """The stale-map guard, the halt file and the persistent blocks (see the module notes)."""
 
-    __slots__ = ("_blocks", "_halt", "_stale")
+    __slots__ = ("_blocks", "_extra", "_halt", "_stale")
 
-    def __init__(self, stale: StaleMapGuard, blocks: BlockStore, state_dir: Path) -> None:
+    def __init__(
+        self,
+        stale: StaleMapGuard,
+        blocks: BlockStore,
+        state_dir: Path,
+        extra: Callable[[], Iterable[ExternalBlock]] | None = None,
+    ) -> None:
         self._stale = stale
         self._blocks = blocks
         self._halt = halt_file(state_dir)
+        self._extra = extra
+
+    def add_source(self, extra: Callable[[], Iterable[ExternalBlock]]) -> None:
+        """Add the broker blocks (Practice and Combine Order_Mode)."""
+        self._extra = extra
 
     @property
     def stale(self) -> StaleMapGuard:
@@ -106,4 +121,6 @@ class Guards:
             out.append(found.external())
         else:
             out.extend(r.external() for r in found)
+        if self._extra is not None:
+            out.extend(self._extra())
         return tuple(out)
