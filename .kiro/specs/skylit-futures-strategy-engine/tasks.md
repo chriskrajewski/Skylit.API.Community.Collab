@@ -1093,8 +1093,8 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
     - **Property 73: Observer independence**
     - **Validates: Requirements 23.10, 25.14, 25.15**
 
-- [ ] 37. README completion and repository checks
-  - [ ] 37.1 Complete the README
+- [x] 37. README completion and repository checks
+  - [x] 37.1 Complete the README
     - Add:
       - one complete command line for `fse pull`, `fse backtest`, `fse report`, `fse paper` and `fse scan-secrets`
       - the account-rule verification notice
@@ -1103,7 +1103,7 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
       - a pointer to the design's Practice checklist before any Combine use
     - _Requirements: 1.2, 1.17, 15.20, 24.28_
 
-  - [ ] 37.2 Write smoke tests for the repository layout
+  - [x] 37.2 Write smoke tests for the repository layout
     - Check:
       - the README entries and sections, and a `LICENSE` with no placeholders
       - `.env.example` names with empty values, and the `.gitignore` entries

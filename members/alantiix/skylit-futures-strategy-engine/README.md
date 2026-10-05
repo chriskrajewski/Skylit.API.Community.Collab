@@ -4,7 +4,7 @@
 - Project identifier: skylit-futures-strategy-engine
 - Kind: agent
 
-Status: early development. Each command's full command line is added here when that command is built.
+Status: every command is built and tested against mocked services. No backtest result on real Skylit history is published here, and no Practice or Combine order has been placed.
 
 ## What it does
 
@@ -62,6 +62,46 @@ Needs Python 3.14 and git. Run these from this folder.
 
 The Data_Cache and every run output default to `~/.skylit-fse/` (`cache/`, `runs/`, `recordings/`, `live-state/`, `logs/`), outside the repository. A configured path inside the repository that git does not ignore is refused.
 
+## How to run
+
+Run these from this folder with the virtual environment active. Dates are New York session dates, both inclusive. Every command prints its options with `fse <command> --help`.
+
+1. Pull Skylit history, MES and MNQ bars, VIX daily values and dark-pool prints into the Data_Cache:
+
+   ```sh
+   fse pull --start 2025-10-06 --end 2026-10-02 --instruments MES,MNQ --dark-pool --label-sample-minutes 15
+   ```
+
+   The estimate (requests, credits, disk) is printed before the first request. A 364-day pull at full resolution takes hours. Rerun the same command to resume. MES and MNQ bars need `projectx_contract_id` set for each contract in `calendars/roll_calendar.yaml`. `--label-sample-minutes` stores Skylit `nodeType` labels, which the report's King and Gatekeeper agreement needs.
+
+2. Backtest the Playbook_Baseline on the cached sessions, with no network request:
+
+   ```sh
+   fse backtest --config configs/playbook_baseline.yaml --start 2025-10-06 --end 2026-10-02 --offline --seed 1
+   ```
+
+   The shipped config exits 2 until the Operator sets the commission and exchange fee per instrument and `regime.min_abs_value`. The command prints the run id.
+
+3. Write the report of that run:
+
+   ```sh
+   fse report --run <run id>
+   ```
+
+4. Run today's session on live data in Paper Order_Mode. No order is sent to ProjectX:
+
+   ```sh
+   fse paper --config configs/playbook_baseline.yaml
+   ```
+
+5. Before each commit, check that no tracked file holds a secret value:
+
+   ```sh
+   fse scan-secrets
+   ```
+
+Other commands: `fse experiment` (ablation, sweep, pass estimate, holdout, walk-forward, cadence), `fse drafts`, `fse skilldocs`, `fse calibrate`, `fse import-vix`, `fse halt`, `fse clear` and `fse live`.
+
 ## Environment variables
 
 Every variable in `.env.example` is listed below. Values come only from the shell environment or `.env`; no command takes a credential or account id as an argument.
@@ -82,3 +122,15 @@ Order_Modes: Paper (in-process paper broker, the default), Practice (the Project
 - Every command replaces each non-blank Secret_Variable value with `[REDACTED]` in logs, reports, manifests, recordings, Finding_Cards and error output.
 - `fse scan-secrets` searches tracked files for every non-blank Secret_Variable value. It exits with an error when all of them are blank.
 - Short values such as account ids match unrelated text more often, so a scanner hit on one may be a false positive.
+
+## Account rules
+
+The Account_Simulator applies the Topstep 50K Trading Combine rules listed in [docs/account-rules.md](docs/account-rules.md), with each value's source and the date it was checked. **The Operator verifies every account rule value against the [Topstep help center](https://help.topstep.com/en/) before enabling Combine Order_Mode.**
+
+## Practice and Combine Order_Modes
+
+`fse paper` never sends an order to ProjectX. Before `fse live` in Practice or Combine Order_Mode:
+
+- **TopstepX API terms.** The Operator confirms the current TopstepX API terms, including the device and VPN rules, before enabling Combine Order_Mode.
+- **Auto OCO Brackets (OQ7).** Practice and Combine need the ProjectX account in Auto OCO Brackets mode. In Position Brackets mode every bracket is rejected with `errorCode 2`; the engine then closes the position and blocks new entries until `fse clear`.
+- **Practice checklist.** Work through the design's [Practice checklist before Combine Order_Mode](../../../.kiro/specs/skylit-futures-strategy-engine/design.md#practice-checklist-before-combine-order_mode) before any Combine use.
