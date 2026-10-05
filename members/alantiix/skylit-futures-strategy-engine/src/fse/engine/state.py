@@ -81,6 +81,7 @@ from fse.pit.protocols import SymMetric
 from fse.timekit import Instant
 
 __all__ = [
+    "ENGINE_CODEC",
     "STATE_FORMAT",
     "STATE_VERSION",
     "TRADE_SESSIONS_KEPT",
@@ -88,7 +89,9 @@ __all__ = [
     "EngineState",
     "JsonValue",
     "SessionTrades",
+    "StateCodec",
     "StateDecodeError",
+    "dataclass_registry",
     "decode_value",
     "encode_value",
 ]
@@ -288,9 +291,53 @@ _CLASSES: Final[Mapping[str, _Registered]] = MappingProxyType(
 )
 """The engine dataclasses a state can hold: the only classes :func:`decode_value` builds."""
 
-_NAMES: Final[Mapping[object, str]] = MappingProxyType({r.cls: n for n, r in _CLASSES.items()})
-
 _MODELS: Final[Mapping[str, type[ChartConfig]]] = MappingProxyType({"ChartConfig": ChartConfig})
+
+
+def dataclass_registry(*modules: ModuleType) -> dict[str, _Registered]:
+    """Every dataclass defined in ``modules``, keyed ``<module short name>.<Class>``.
+
+    The live state store (``fse.live.state_store``) adds the simulator's
+    dataclasses to :data:`ENGINE_CODEC`'s with :meth:`StateCodec.extended`.
+    """
+    return _module_dataclasses(*modules)
+
+
+class StateCodec:
+    """The module's JSON rules over one set of decodable dataclasses.
+
+    :data:`ENGINE_CODEC` holds the engine state types; ``encode_value`` and
+    ``decode_value`` use it.
+    """
+
+    __slots__ = ("_classes", "_names")
+
+    def __init__(self, classes: Mapping[str, _Registered]) -> None:
+        self._classes: Mapping[str, _Registered] = MappingProxyType(dict(classes))
+        self._names: Mapping[object, str] = MappingProxyType(
+            {r.cls: n for n, r in self._classes.items()}
+        )
+
+    def extended(self, classes: Mapping[str, _Registered]) -> StateCodec:
+        """A codec that also encodes and decodes ``classes``."""
+        return StateCodec({**self._classes, **classes})
+
+    def encode(self, value: object) -> JsonValue:
+        """``value`` as plain JSON values; ``TypeError`` or ``ValueError``."""
+        return _encode(value, "$", self._names)
+
+    def decode(self, obj: object) -> object:
+        """The value :meth:`encode` encoded; :class:`StateDecodeError` otherwise."""
+        try:
+            return _decode(obj, "$", self._classes)
+        except StateDecodeError:
+            raise
+        except (TypeError, ValueError, KeyError, InvalidOperation, ZeroDivisionError) as exc:
+            raise StateDecodeError(f"cannot decode the EngineState: {exc}") from exc
+
+
+ENGINE_CODEC: Final = StateCodec(_CLASSES)
+"""The codec of the engine state types (:data:`_CLASSES`)."""
 
 
 # ---------------------------------------------------------------- encoding
@@ -298,14 +345,14 @@ _MODELS: Final[Mapping[str, type[ChartConfig]]] = MappingProxyType({"ChartConfig
 
 def encode_value(value: object) -> JsonValue:
     """``value`` as plain JSON values by the module rules; ``TypeError`` or ``ValueError``."""
-    return _encode(value, "$")
+    return ENGINE_CODEC.encode(value)
 
 
 def _text(value: JsonValue) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
 
-def _encode(value: object, path: str) -> JsonValue:
+def _encode(value: object, path: str, names: Mapping[object, str]) -> JsonValue:
     if value is None or isinstance(value, bool | str):
         return value
     if isinstance(value, int | numbers.Integral):
@@ -327,27 +374,30 @@ def _encode(value: object, path: str) -> JsonValue:
     if isinstance(value, date):
         return {_DATE: value.isoformat()}
     if isinstance(value, tuple):
-        return [_encode(item, f"{path}[{i}]") for i, item in enumerate(value)]
+        return [_encode(item, f"{path}[{i}]", names) for i, item in enumerate(value)]
     if isinstance(value, frozenset):
-        items = [_encode(item, f"{path}[]") for item in value]
+        items = [_encode(item, f"{path}[]", names) for item in value]
         return {_FROZENSET: sorted(items, key=_text)}
     if isinstance(value, ChartConfig):
-        return {_MODEL: "ChartConfig", _MODEL_DATA: _encode(value.model_dump(), f"{path}.data")}
+        return {
+            _MODEL: "ChartConfig",
+            _MODEL_DATA: _encode(value.model_dump(), f"{path}.data", names),
+        }
     if isinstance(value, Mapping):
         return {
             _MAP: [
-                [_encode(k, f"{path}{{key}}"), _encode(v, f"{path}[{k!r}]")]
+                [_encode(k, f"{path}{{key}}", names), _encode(v, f"{path}[{k!r}]", names)]
                 for k, v in value.items()
             ]
         }
     if dataclasses.is_dataclass(value) and not isinstance(value, type):
-        name = _NAMES.get(type(value))
+        name = names.get(type(value))
         if name is None:
             raise TypeError(f"{type(value).__qualname__} at {path} is not an EngineState type")
         out: dict[str, JsonValue] = {_TYPE: name}
         for f in dataclasses.fields(value):
             if f.init:
-                out[f.name] = _encode(getattr(value, f.name), f"{path}.{f.name}")
+                out[f.name] = _encode(getattr(value, f.name), f"{path}.{f.name}", names)
         return out
     raise TypeError(f"cannot encode {type(value).__qualname__} at {path} in an EngineState")
 
@@ -357,15 +407,10 @@ def _encode(value: object, path: str) -> JsonValue:
 
 def decode_value(obj: object) -> object:
     """The value :func:`encode_value` encoded; :class:`StateDecodeError` otherwise."""
-    try:
-        return _decode(obj, "$")
-    except StateDecodeError:
-        raise
-    except (TypeError, ValueError, KeyError, InvalidOperation, ZeroDivisionError) as exc:
-        raise StateDecodeError(f"cannot decode the EngineState: {exc}") from exc
+    return ENGINE_CODEC.decode(obj)
 
 
-def _decode(obj: object, path: str) -> object:
+def _decode(obj: object, path: str, classes: Mapping[str, _Registered]) -> object:
     if obj is None or isinstance(obj, bool | int | str):
         return obj
     if isinstance(obj, float):
@@ -373,20 +418,22 @@ def _decode(obj: object, path: str) -> object:
             raise StateDecodeError(f"a non-finite number at {path}")
         return obj
     if isinstance(obj, list):
-        return tuple(_decode(item, f"{path}[{i}]") for i, item in enumerate(obj))
+        return tuple(_decode(item, f"{path}[{i}]", classes) for i, item in enumerate(obj))
     if not isinstance(obj, dict):
         raise StateDecodeError(f"unexpected {type(obj).__name__} at {path}")
     if _TYPE in obj:
-        return _decode_dataclass(obj, path)
+        return _decode_dataclass(obj, path, classes)
     if _MODEL in obj:
-        return _decode_model(obj, path)
+        return _decode_model(obj, path, classes)
     if len(obj) != 1:
         raise StateDecodeError(f"an object at {path} has no type tag")
     ((tag, payload),) = obj.items()
-    return _decode_tagged(tag, payload, path)
+    return _decode_tagged(tag, payload, path, classes)
 
 
-def _decode_tagged(tag: str, payload: object, path: str) -> object:
+def _decode_tagged(
+    tag: str, payload: object, path: str, classes: Mapping[str, _Registered]
+) -> object:
     if tag == _FLOAT and isinstance(payload, str) and payload in _INFINITIES:
         return _INFINITIES[payload]
     if tag == _DECIMAL and isinstance(payload, str):
@@ -399,36 +446,38 @@ def _decode_tagged(tag: str, payload: object, path: str) -> object:
     if tag == _DATE and isinstance(payload, str):
         return date.fromisoformat(payload)
     if tag == _FROZENSET and isinstance(payload, list):
-        return frozenset(_decode(item, f"{path}[]") for item in payload)
+        return frozenset(_decode(item, f"{path}[]", classes) for item in payload)
     if tag == _MAP and isinstance(payload, list):
         out: dict[object, object] = {}
         for i, pair in enumerate(payload):
             if not isinstance(pair, list) or len(pair) != 2:
                 raise StateDecodeError(f"a map entry at {path}[{i}] is not a [key, value] pair")
-            key = _decode(pair[0], f"{path}[{i}].key")
+            key = _decode(pair[0], f"{path}[{i}].key", classes)
             if key in out:
                 raise StateDecodeError(f"a map at {path} repeats the key {key!r}")
-            out[key] = _decode(pair[1], f"{path}[{i}].value")
+            out[key] = _decode(pair[1], f"{path}[{i}].value", classes)
         return out
     raise StateDecodeError(f"unknown or malformed tag {tag!r} at {path}")
 
 
-def _decode_dataclass(obj: dict[str, object], path: str) -> object:
+def _decode_dataclass(
+    obj: dict[str, object], path: str, classes: Mapping[str, _Registered]
+) -> object:
     name = obj[_TYPE]
-    registered = _CLASSES.get(name) if isinstance(name, str) else None
+    registered = classes.get(name) if isinstance(name, str) else None
     if registered is None:
         raise StateDecodeError(f"{name!r} at {path} is not an EngineState type")
     given = set(obj) - {_TYPE}
     if not given <= registered.fields:
         unknown = sorted(given - registered.fields)
         raise StateDecodeError(f"{name} at {path} has unknown fields {unknown}")
-    kwargs = {k: _decode(v, f"{path}.{k}") for k, v in obj.items() if k != _TYPE}
+    kwargs = {k: _decode(v, f"{path}.{k}", classes) for k, v in obj.items() if k != _TYPE}
     return registered.cls(**kwargs)
 
 
-def _decode_model(obj: dict[str, object], path: str) -> object:
+def _decode_model(obj: dict[str, object], path: str, classes: Mapping[str, _Registered]) -> object:
     name = obj[_MODEL]
     model = _MODELS.get(name) if isinstance(name, str) else None
     if model is None or set(obj) != {_MODEL, _MODEL_DATA}:
         raise StateDecodeError(f"a malformed or unknown config model at {path}")
-    return model.model_validate(_decode(obj[_MODEL_DATA], f"{path}.data"))
+    return model.model_validate(_decode(obj[_MODEL_DATA], f"{path}.data", classes))

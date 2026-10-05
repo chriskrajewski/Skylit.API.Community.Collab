@@ -8,7 +8,8 @@
   so :class:`~fse.pit.market_view.HistoricalInputs` makes it available at
   ``max(Observation_Time, receipt_time)``, as the live ring buffers did. Each
   series keeps recording order, so every query answers as the live view did.
-  The VIX daily records go through the same slot rule as
+  A dark-pool ticker counts as fetched from its first recorded fetch, as
+  in the live ring buffers. The VIX daily records go through the same slot rule as
   :meth:`LiveInputs.set_vix_daily <fse.pit.market_view.LiveInputs.set_vix_daily>`;
   the last value of each slot is used.
 - **Decision_Times** are the recorded ``decision_time`` entries, which must
@@ -112,6 +113,7 @@ def load_replay(
     bars: list[Received[Bar]] = []
     vix_bars: list[Received[Bar]] = []
     dark_pool: dict[str, list[Received[DarkPoolPrint]]] = {}
+    fetched_at: dict[str, Instant] = {}
     today: tuple[VixDailyRecord | None, VixDailyRecord | None] = (None, None)
     prior: tuple[VixDailyRecord | None, VixDailyRecord | None] = (None, None)
     times: list[Instant] = []
@@ -128,6 +130,7 @@ def load_replay(
                     bars.append(Received(decode_bar(entry.payload), at))
                 case "dark_pool":
                     ticker, prints = decode_dark_pool(entry.payload)
+                    fetched_at.setdefault(ticker, at)
                     dark_pool.setdefault(ticker, []).extend(Received(p, at) for p in prints)
                 case "vix":
                     value = decode_vix(entry.payload)
@@ -161,6 +164,7 @@ def load_replay(
         vix_bars=vix_bars,
         dark_pool=dark_pool,
         events=events,
+        dark_pool_fetched_at=fetched_at,
     )
     keys = set(inputs.keys)
     kept = tuple(

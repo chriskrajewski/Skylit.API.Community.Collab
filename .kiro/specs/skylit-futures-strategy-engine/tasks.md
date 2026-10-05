@@ -940,12 +940,12 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
     - `src/fse/backtest/replay.py`, plus `mode="replay"` in `src/fse/backtest/runner.py`: the recorded receipt times become `available_at`, and replay uses the recorded Decision_Times and guard events
     - _Requirements: 23.9_
 
-- [ ] 33. Paper_Broker, Live_Runner, guards and Finding_Cards
-  - [ ] 33.1 Implement the Paper_Broker
+- [x] 33. Paper_Broker, Live_Runner, guards and Finding_Cards
+  - [x] 33.1 Implement the Paper_Broker
     - `src/fse/sim/paper_broker.py`: an in-process broker using the Fill_Simulator rules
     - _Requirements: 23.15_
 
-  - [ ] 33.2 Implement live state, persistent blocks, `fse halt` and `fse clear`
+  - [x] 33.2 Implement live state, persistent blocks, `fse halt` and `fse clear`
     - `src/fse/live/state_store.py`:
       - write EngineState after every Decision_Time (temp file, fsync, rename)
       - restore it on start
@@ -954,14 +954,14 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
     - `src/fse/commands/halt.py`: `fse halt` and `fse clear`
     - _Requirements: 16.10, 24.10, 24.26, 24.27_
 
-  - [ ] 33.3 Implement live guards
+  - [x] 33.3 Implement live guards
     - `src/fse/live/guards.py`:
       - the stale-map guard: at 30 s, cancel resting entries within 1 s and block entries until fresh
       - a halt-file check at every Decision_Time
       - persistent blocks passed as `external_blocks` and recorded as `guard_event`
     - _Requirements: 23.7, 24.26, 24.27_
 
-  - [ ] 33.4 Implement Finding_Cards and the Notifier
+  - [x] 33.4 Implement Finding_Cards and the Notifier
     - `src/fse/notify/finding_card.py`: `build_card` and `should_send`, the premarket card, and 2R alerts
     - `src/fse/notify/notifier.py`:
       - console, file and webhook sinks, with `NOTIFIER_WEBHOOK_URL` read from `EnvView`
@@ -969,7 +969,7 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
       - a delivery failure is logged and changes no order logic
     - _Requirements: 25.1, 25.2, 25.3, 25.4, 25.5, 25.6, 25.7, 25.8, 25.14_
 
-  - [ ] 33.5 Implement the Live_Runner, order router and `fse paper`
+  - [x] 33.5 Implement the Live_Runner, order router and `fse paper`
     - `src/fse/live/runner.py`, `src/fse/live/order_router.py` and `src/fse/commands/paper.py` (`fse paper --config`, which always runs in Paper Order_Mode):
       - the run window
       - refuse a refresh interval under 5 s (exit 2)
@@ -980,27 +980,27 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
       - in Paper mode, the Broker_Adapter has no order methods
     - _Requirements: 23.1, 23.2, 23.5, 23.6, 23.11, 23.12, 23.13, 23.15, 24.2, 25.13_
 
-  - [ ] 33.6 Write property test for paper isolation
+  - [x] 33.6 Write property test for paper isolation
     - **Property 71: Paper isolation**
     - **Validates: Requirements 23.1, 23.15**
 
-  - [ ] 33.7 Write property test for the stale-map guard
+  - [x] 33.7 Write property test for the stale-map guard
     - **Property 72: Stale-map guard**
     - **Validates: Requirements 23.7**
 
-  - [ ] 33.8 Write property test for replay parity
+  - [x] 33.8 Write property test for replay parity
     - **Property 70: Replay parity**
     - **Validates: Requirements 23.5, 23.9**
 
-  - [ ] 33.9 Write property test for card completeness
+  - [x] 33.9 Write property test for card completeness
     - **Property 80: Card completeness**
     - **Validates: Requirements 25.1, 25.2, 25.3, 25.4**
 
-  - [ ] 33.10 Write property test for the send schedule
+  - [x] 33.10 Write property test for the send schedule
     - **Property 81: Send schedule**
     - **Validates: Requirements 25.5, 25.6, 25.8**
 
-  - [ ] 33.11 Write integration tests for the Live_Runner with a fake clock
+  - [x] 33.11 Write integration tests for the Live_Runner with a fake clock
     - Cover:
       - polling request shape and stream reconnect
       - refresh errors, the stale guard and the credit projection log

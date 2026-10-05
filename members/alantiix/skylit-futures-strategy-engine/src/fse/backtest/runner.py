@@ -46,14 +46,24 @@ the bars of one interval together (instruments in name order):
 Then :meth:`Engine.step` runs with the bar-phase events, its intents go to the
 Fill_Simulator, and its payload becomes one decision-log line (Req 18.6).
 
-**Intent routing.** ``PlaceBracket`` goes to ``SimBook.submit_bracket`` once
+**Intent routing.** Every intent goes to the
+:class:`~fse.sim.paper_broker.PaperBroker` (the Fill_Simulator's book plus
+the Account_Simulator): ``PlaceBracket`` joins the book once
 :meth:`AccountSim.check_order` accepts its entry; a refusal becomes an
 :class:`~fse.engine.step.EntryRejected` event for the next step.
-``ModifyOrder``, ``CancelOrder`` and ``SubmitExit`` go to ``SimBook.modify``,
-``cancel`` and ``submit_exit``; one that refers to an order or trade the
-Fill_Simulator no longer holds (it filled, or an account rule closed it)
-changes nothing. Every order fills only on bars that open at or after its
-placement or change (Req 5.5-5.6).
+``ModifyOrder``, ``CancelOrder`` and ``SubmitExit`` change the book; one that
+refers to an order or trade the Fill_Simulator no longer holds (it filled, or
+an account rule closed it) changes nothing. Every order fills only on bars
+that open at or after its placement or change (Req 5.5-5.6).
+
+**One loop for the Backtester and the Live_Runner** (Req 23.5).
+:class:`SessionLoop` holds the engine state and the Paper_Broker. The
+Backtester calls :meth:`SessionLoop.run_session` per session; the
+Live_Runner's Paper Order_Mode calls :meth:`SessionLoop.begin_session` (or
+``resume_session`` after a restart), :meth:`SessionLoop.advance` at each live
+Decision_Time with the bars that became available, and
+:meth:`SessionLoop.finish_session`, so a live session and its replay run the
+same code.
 
 **Session end.** After the last Decision_Time, the bars up to the
 Flat_Deadline run through the bar phase too. At the Flat_Deadline (at the
@@ -167,7 +177,7 @@ from fse.data.catalog import BarsCoverageRecord
 from fse.data.medians import MedianParams, RegimeMedianStore
 from fse.data.vix import VIX_INSTRUMENT, VIX_INTERVAL_S, prior_session
 from fse.engine.nodes import NodeParams
-from fse.engine.planner import CancelOrder, ModifyOrder, OrderFill, OrderIntent, PlaceBracket
+from fse.engine.planner import OrderFill, OrderIntent
 from fse.engine.risk import RiskFill
 from fse.engine.state import EngineState
 from fse.engine.step import (
@@ -177,6 +187,7 @@ from fse.engine.step import (
     EntryRejected,
     ExternalBlock,
     StepEvent,
+    StepResult,
 )
 from fse.engine.taps import BASE_INTERVAL_S
 from fse.engine.types import (
@@ -193,17 +204,12 @@ from fse.engine.types import (
 from fse.experiments.holdout import HoldoutError, HoldoutPeriod, compute_holdout_period
 from fse.logio import LogWriter
 from fse.logio.canonical_json import JsonValue, dumps, ny_iso, to_jsonable
-from fse.pit.market_view import MAP_METRICS, HistoricalInputs, HistoricalMarketView, heatmap_view
+from fse.pit.market_view import MAP_METRICS, HistoricalInputs, heatmap_view
+from fse.pit.protocols import MarketView
 from fse.settings import project_dir
-from fse.sim.account import (
-    AccountRejection,
-    AccountSim,
-    AttemptResult,
-    FlatDeadlineClose,
-    Liquidation,
-)
-from fse.sim.fills import FillEvent, SimBook, close_all
-from fse.sim.fills import on_bar as fill_bar
+from fse.sim.account import AccountSim, AttemptResult, FlatDeadlineClose, Liquidation
+from fse.sim.fills import FillEvent
+from fse.sim.paper_broker import PaperBroker, PricedClose
 from fse.timekit import NS_PER_SECOND, Instant, SessionCalendar, SessionTimes
 
 __all__ = [
@@ -222,10 +228,13 @@ __all__ = [
     "BacktestInputError",
     "BacktestMode",
     "BacktestResult",
+    "BarGroup",
     "SessionCheck",
+    "SessionLoop",
     "SessionOutcome",
     "WindowGap",
     "backtest_range",
+    "bar_groups",
     "cache_holdout",
     "cache_sessions_with_data",
     "check_sessions",
@@ -237,6 +246,7 @@ __all__ = [
     "resolve_seed",
     "run_backtest",
     "trades_csv",
+    "trading_fees",
 ]
 
 BACKTEST_KIND: Final = "backtest"
@@ -681,7 +691,7 @@ def trades_csv(trades: Iterable[Trade]) -> str:
 
 
 @dataclass(frozen=True, slots=True)
-class _Group:
+class BarGroup:
     """The bars of one 1-minute interval, one per instrument, in instrument order."""
 
     open_ns: Instant
@@ -692,16 +702,16 @@ class _Group:
         return {b.instrument: b for b in self.bars}
 
 
-def _groups(bars: Sequence[Bar], first_open: Instant, last_close: Instant) -> list[_Group]:
-    out: list[_Group] = []
+def bar_groups(bars: Sequence[Bar], first_open: Instant, last_close: Instant) -> list[BarGroup]:
+    out: list[BarGroup] = []
     for bar in bars:
         if bar.open_ns < first_open or bar.close_ns > last_close:
             continue
         if out and out[-1].open_ns == bar.open_ns:
             last = out[-1]
-            out[-1] = _Group(last.open_ns, last.close_ns, (*last.bars, bar))
+            out[-1] = BarGroup(last.open_ns, last.close_ns, (*last.bars, bar))
         else:
-            out.append(_Group(bar.open_ns, bar.close_ns, (bar,)))
+            out.append(BarGroup(bar.open_ns, bar.close_ns, (bar,)))
     return out
 
 
@@ -711,7 +721,7 @@ def _released(
     times: Sequence[Instant],
     first_open: Instant,
     last_close: Instant,
-) -> tuple[list[list[_Group]], list[_Group]]:
+) -> tuple[list[list[BarGroup]], list[BarGroup]]:
     """Replay's bar phase: the groups released at each Decision_Time, and those left after.
 
     A bar is released at the first Decision_Time at or after it became
@@ -722,39 +732,44 @@ def _released(
         (i for i, b in enumerate(bars) if b.open_ns >= first_open and b.close_ns <= last_close),
         key=lambda i: (available[i], bars[i].open_ns, bars[i].instrument),
     )
-    batches: list[list[_Group]] = []
+    batches: list[list[BarGroup]] = []
     j = 0
     for t in times:
         start = j
         while j < len(order) and available[order[j]] <= t:
             j += 1
         batch = sorted((bars[i] for i in order[start:j]), key=lambda b: (b.open_ns, b.instrument))
-        batches.append(_groups(batch, first_open, last_close))
+        batches.append(bar_groups(batch, first_open, last_close))
     rest = sorted((bars[i] for i in order[j:]), key=lambda b: (b.open_ns, b.instrument))
-    return batches, _groups(rest, first_open, last_close)
+    return batches, bar_groups(rest, first_open, last_close)
 
 
-class _Loop:
-    """The mutable state of one run: engine state, Fill_Simulator book and account."""
+class SessionLoop:
+    """The decision loop of one run: engine state, Paper_Broker and the run's records.
+
+    The Backtester drives it with :meth:`run_session`; the Live_Runner drives
+    the same methods one Decision_Time at a time (:meth:`begin_session`,
+    :meth:`advance`, :meth:`finish_session`), so a live paper session and its
+    replay run the same code (Req 23.5, 23.9).
+    """
 
     def __init__(
         self,
         cfg: StrategyConfig,
         engine: Engine,
-        account: AccountSim,
+        broker: PaperBroker,
         calendar: SessionCalendar,
         log: DecisionLog,
         shadow_mode: ShadowMode,
     ) -> None:
         self._cfg = cfg
         self._engine = engine
-        self._account = account
+        self.broker = broker
         self._calendar = calendar
         self._log = log
         self._instruments = engine.params.instruments
         self._cadence_s = cfg.time.decision_cadence_s
         self.state: EngineState = engine.initial_state()
-        self.book = SimBook()
         self.shadows = ShadowBook(cfg.fills, engine.params.planner, cfg.sizing, shadow_mode)
         self.pending: list[StepEvent] = []
         self.trades: list[Trade] = []
@@ -762,69 +777,134 @@ class _Loop:
         self.tap_counts: list[TapCounts] = []
         self.agreement = NodeAgreement()
         self.decision_times = 0
-        self._last_bar: dict[str, Bar] = {}
-        self._day_low: Money = _ZERO
-        self._truncated = False
+        self.day_low: Money = _ZERO
+        self.truncated = False
+        self._session: date | None = None
+        self._bars: list[Bar] = []
+        self._ended = False
+        self._held: list[tuple[Bar, FillEvent]] | None = None
+
+    @property
+    def engine(self) -> Engine:
+        return self._engine
+
+    @property
+    def session(self) -> date | None:
+        """The session in progress (between :meth:`begin_session` and :meth:`finish_session`)."""
+        return self._session
 
     # ------------------------------------------------------------ sessions
 
     def run_session(self, data: _Session) -> None:
+        """One whole session from its loaded inputs (the Backtester)."""
         cal = self._calendar
         session = data.session
-        self._account.start_trading_day(session)
-        self._day_low = _ZERO
-        self._truncated = False
+        self.begin_session(session, data.bars)
         deadline = cal.flat_deadline(session)
-        rth = (cal.rth_open(session), cal.rth_close(session))
-        self.shadows.start_session(session, rth)
-        # The closing fills are stamped on the bar that opens at the deadline, so
-        # the engine first sees them when that bar has closed (Req 5.3).
-        observed = deadline + BASE_INTERVAL_S * NS_PER_SECOND
         first_open = cal.trading_day_start(session)
         if data.times is None:
             times = cal.decision_times(session, self._cadence_s)
-            groups = _groups(data.bars, first_open, deadline)
+            groups = bar_groups(data.bars, first_open, deadline)
             released = None
         else:
             times = data.times
             assert data.bar_available is not None  # set with the times (replay)
             released, groups = _released(data.bars, data.bar_available, times, first_open, deadline)
         i = 0
-        ended = False
-        held: list[tuple[Bar, FillEvent]] | None = None
         for k, t in enumerate(times):
             view = data.inputs.view(t)
             if released is None:
+                start = i
                 while i < len(groups) and groups[i].close_ns <= t:
-                    self._bar_phase(groups[i], view, rth)
                     i += 1
+                due = groups[start:i]
             else:
-                for group in released[k]:
-                    self._bar_phase(group, view, rth)
-            if not ended and t >= deadline:
-                held = self._end_day(data, deadline)
-                ended = True
-            if held is not None and t >= observed:
-                self._deliver(held)
-                held = None
+                due = released[k]
             blocks = () if data.blocks is None else data.blocks.get(t, ())
-            self._decide(view, t, blocks)
-        if not ended:
-            view = data.inputs.view(deadline)
-            for group in groups[i:]:
+            self.advance(t, view, due, blocks)
+        self.finish_session(data.inputs.view(deadline), groups[i:], data.agreement)
+
+    def begin_session(self, session: date, bars: Iterable[Bar] = ()) -> None:
+        """Start ``session``'s trading day; ``bars`` are its futures bars known so far."""
+        self.broker.account.start_trading_day(session)
+        self.day_low = _ZERO
+        self.truncated = False
+        self.resume_session(session, bars)
+
+    def resume_session(self, session: date, bars: Iterable[Bar] = ()) -> None:
+        """Continue ``session``, whose trading day the (restored) account has started."""
+        cal = self._calendar
+        self.shadows.start_session(session, (cal.rth_open(session), cal.rth_close(session)))
+        self._session = session
+        self._bars = list(bars)
+        self._ended = False
+        self._held = None
+
+    def add_bars(self, bars: Iterable[Bar]) -> None:
+        """Futures bars received since; the Flat_Deadline close looks its bars up here."""
+        self._bars.extend(bars)
+
+    def advance(
+        self,
+        t: Instant,
+        view: MarketView,
+        groups: Iterable[BarGroup],
+        blocks: Sequence[ExternalBlock] = (),
+    ) -> StepResult:
+        """Decision_Time ``t``: the bar phase of ``groups``, the Flat_Deadline, then the step."""
+        session = self._require_session()
+        cal = self._calendar
+        rth = (cal.rth_open(session), cal.rth_close(session))
+        for group in groups:
+            self._bar_phase(group, view, rth)
+        deadline = cal.flat_deadline(session)
+        if not self._ended and t >= deadline:
+            self._held = self._end_day(session, deadline)
+            self._ended = True
+        # The closing fills are stamped on the bar that opens at the deadline, so
+        # the engine first sees them when that bar has closed (Req 5.3).
+        if self._held is not None and t >= deadline + BASE_INTERVAL_S * NS_PER_SECOND:
+            self._deliver(self._held)
+            self._held = None
+        return self._decide(view, t, blocks)
+
+    def finish_session(
+        self,
+        view: MarketView,
+        rest: Iterable[BarGroup],
+        agreement: NodeAgreement | None = None,
+    ) -> None:
+        """End the session: the bars left, the Flat_Deadline close, the session records.
+
+        ``view`` is the MarketView at the Flat_Deadline.
+        """
+        session = self._require_session()
+        cal = self._calendar
+        if not self._ended:
+            rth = (cal.rth_open(session), cal.rth_close(session))
+            for group in rest:
                 self._bar_phase(group, view, rth)
-            held = self._end_day(data, deadline)
-        if held is not None:
-            self._deliver(held)
-        net = self._account.day_pnl
-        self.outcomes.append(SessionOutcome(session, net, min(self._day_low, net), self._truncated))
+            self._held = self._end_day(session, cal.flat_deadline(session))
+        if self._held is not None:
+            self._deliver(self._held)
+            self._held = None
+        net = self.broker.account.day_pnl
+        self.outcomes.append(SessionOutcome(session, net, min(self.day_low, net), self.truncated))
         self.shadows.finish_session(self.state.taps)
         self.tap_counts.append(tap_counts(self.state.taps, session, cal))
-        self.agreement += data.agreement
+        if agreement is not None:
+            self.agreement += agreement
+        self._session = None
+        self._bars = []
+
+    def _require_session(self) -> date:
+        if self._session is None:
+            raise ValueError("no session is in progress; call begin_session first")
+        return self._session
 
     def _decide(
-        self, view: HistoricalMarketView, t: Instant, blocks: Sequence[ExternalBlock] = ()
-    ) -> None:
+        self, view: MarketView, t: Instant, blocks: Sequence[ExternalBlock] = ()
+    ) -> StepResult:
         events = tuple(self.pending)
         self.pending.clear()
         result = self._engine.step(self.state, view, t, events, blocks)
@@ -833,30 +913,26 @@ class _Loop:
         self._log.write(result.payload)
         self.shadows.on_decision(t, result.payload, result.context, self.state.taps)
         self.decision_times += 1
+        return result
 
     # ------------------------------------------------------------ the bar phase
 
-    def _bar_phase(
-        self, group: _Group, view: HistoricalMarketView, rth: tuple[Instant, Instant]
-    ) -> None:
+    def _bar_phase(self, group: BarGroup, view: MarketView, rth: tuple[Instant, Instant]) -> None:
         eng = self._engine
+        broker = self.broker
         bars = group.by_instrument()
-        fills: list[tuple[Bar, FillEvent]] = []
-        for bar in group.bars:
-            self.book, events = fill_bar(self.book, bar, self._cfg.fills, rth=rth)
-            for event in events:
-                self._account.on_fill(event.fill, event.order)
-                fills.append((bar, event))
+        fills = broker.fill(group.bars, rth)
         self.shadows.on_main_fills(event for _, event in fills)
         for bar in group.bars:
             self.shadows.on_bar(bar)
-        self._day_low = min(self._day_low, self._account.day_pnl + self._unrealized(bars))
-        for account_event in self._account.on_bar(bars):
+        account = broker.account
+        self.day_low = min(self.day_low, account.day_pnl + broker.unrealized(bars))
+        for account_event in broker.check_account(bars):
             if isinstance(account_event, Liquidation):
                 fills.extend(self._liquidate(account_event, bars))
                 if account_event.rule == "maximum_loss_limit":
-                    self._truncated = True
-                self._day_low = min(self._day_low, self._account.day_pnl)
+                    self.truncated = True
+                self.day_low = min(self.day_low, account.day_pnl)
         self._count(event for _, event in fills)
         # Every bar of the interval, then any older bar a liquidation was stamped on.
         anchors = list(group.bars)
@@ -865,18 +941,18 @@ class _Loop:
                 anchors.append(bar)
         for bar in anchors:
             self._update_stops(bar, fills)
-        positions = self.book.positions()
+        positions = broker.positions()
         self._apply(
             eng.check_loss_stop(
                 self.state,
                 group.close_ns,
                 {i: positions.get(i, 0) for i in self._instruments},
-                self._unrealized(bars),
+                broker.unrealized(bars),
             )
         )
         for bar in group.bars:
             self.state = eng.consume_bar(self.state, bar, view)
-            self._last_bar[bar.instrument] = bar
+        broker.note_bars(group.bars)
 
     def _count(self, events: Iterable[FillEvent]) -> None:
         """Bar phase 3: every fill to the Risk_Manager, and each closed trade to the list."""
@@ -896,52 +972,18 @@ class _Loop:
         self._route(result.intents)
         self.pending.extend(result.events)
 
-    def _unrealized(self, bars: Mapping[str, Bar]) -> Money:
-        """The open trades at their worst price on ``bars`` (the last close without a bar)."""
-        total = _ZERO
-        for trade in self.book.trades.values():
-            bar = bars.get(trade.instrument)
-            if bar is not None:
-                price = trade.worst_price(bar)
-            else:
-                last = self._last_bar.get(trade.instrument)
-                if last is None or last.c_t is None:
-                    raise ValueError(f"no {trade.instrument} bar to value an open trade")
-                price = last.c_t
-            total += trade.unrealized(price)
-        return total
-
     # ------------------------------------------------------------ account closes
 
-    def _close(
-        self, priced: Mapping[tuple[str, Direction], tuple[Bar, Ticks]], reason: str, at: Instant
-    ) -> list[tuple[Bar, FillEvent]]:
+    def _close(self, priced: PricedClose, reason: str, at: Instant) -> list[tuple[Bar, FillEvent]]:
         """Close every open trade and cancel every working order (an account rule fired).
 
-        ``priced`` maps each (instrument, direction) with open trades to the
-        bar the closing fills are stamped with and the closing price. Resting
-        plans lose their orders, so each gets an ``EntryRejected`` for the
-        next step.
+        Resting plans lose their orders, so each gets an ``EntryRejected`` for
+        the next step.
         """
-        out: list[tuple[Bar, FillEvent]] = []
-        cfg = self._cfg.fills
-        for (instrument, direction), (bar, price) in sorted(priced.items()):
-            keys = [
-                k
-                for k, t in self.book.trades.items()
-                if (t.instrument, t.direction) == (instrument, direction)
-            ]
-            part = SimBook(
-                brackets={k: self.book.brackets[k] for k in keys},
-                trades={k: self.book.trades[k] for k in keys},
-                last_bar_open=dict(self.book.last_bar_open),
-            )
-            _, events = close_all(part, bar.open_ns, {instrument: price}, cfg, reason=reason)
-            out.extend((bar, e) for e in events)
+        out = self.broker.close(priced, reason)
         message = f"{reason}: the Account_Simulator cancelled every working order"
         for plan in self.state.book.resting:
             self.pending.append(EntryRejected(plan.key, at, message))
-        self.book = SimBook(last_bar_open=dict(self.book.last_bar_open))
         return out
 
     def _liquidate(
@@ -952,43 +994,40 @@ class _Loop:
         An instrument without a bar on the breach interval is closed on its
         last bar, the bar the Account_Simulator valued it with.
         """
-        priced: dict[tuple[str, Direction], tuple[Bar, Ticks]] = {}
-        for trade in self.book.trades.values():
-            bar = bars.get(trade.instrument) or self._last_bar[trade.instrument]
-            priced[(trade.instrument, trade.direction)] = (bar, trade.worst_price(bar))
-        return self._close(priced, event.rule, event.bar_open_ns)
+        return self._close(self.broker.liquidation_prices(bars), event.rule, event.bar_open_ns)
 
-    def _end_day(self, data: _Session, deadline: Instant) -> list[tuple[Bar, FillEvent]]:
+    def _end_day(self, session: date, deadline: Instant) -> list[tuple[Bar, FillEvent]]:
         """The Flat_Deadline: the account's flat close and day-end rules (Req 15.7, 15.16).
 
         Returns the closing fills; :meth:`_deliver` hands them to the engine.
         """
         closing: dict[str, Bar] = {}
-        for bar in data.bars:
+        for bar in sorted(self._bars, key=lambda b: (b.open_ns, b.instrument)):
             if bar.open_ns >= deadline and bar.instrument not in closing:
                 closing[bar.instrument] = bar
-        for trade in self.book.trades.values():
+        broker = self.broker
+        for trade in broker.trades.values():
             found = closing.get(trade.instrument)
             if found is None or found.open_ns != deadline:
                 raise ValueError(
-                    f"{data.session}: the open {trade.instrument} position needs a bar that "
+                    f"{session}: the open {trade.instrument} position needs a bar that "
                     f"opens at the Flat_Deadline {ny_iso(deadline)}"
                 )
         flat: list[tuple[Bar, FillEvent]] = []
-        for event in self._account.end_trading_day(closing):
+        for event in broker.account.end_trading_day(closing):
             if isinstance(event, FlatDeadlineClose):
                 # Every trade closes at the open of its instrument's deadline bar (Req 15.16),
                 # the price the account closes its net position at. A long and a short of one
                 # instrument can net to no account position, so the bar gives the price.
                 priced: dict[tuple[str, Direction], tuple[Bar, Ticks]] = {}
-                for t in self.book.trades.values():
+                for t in broker.trades.values():
                     bar = closing[t.instrument]
                     assert bar.o_t is not None  # futures bars carry tick prices
                     priced[(t.instrument, t.direction)] = (bar, bar.o_t)
                 flat = self._close(priced, "flat_deadline", deadline)
-        if self.book.trades:
-            raise ValueError(f"{data.session}: open trades remain after the Flat_Deadline")
-        if self.book.orders:
+        if broker.trades:
+            raise ValueError(f"{session}: open trades remain after the Flat_Deadline")
+        if broker.book.orders:
             self._close({}, "flat_deadline", deadline)
         self.shadows.flat_close(closing, deadline)
         return flat
@@ -1002,30 +1041,8 @@ class _Loop:
     # ------------------------------------------------------------ intents
 
     def _route(self, intents: Iterable[OrderIntent]) -> None:
-        """Send planner intents to the Fill_Simulator, each entry through the account first."""
-        for intent in intents:
-            book = self.book
-            if isinstance(intent, PlaceBracket):
-                entry = intent.entry
-                working = [o for o in book.working_orders() if o.role == "entry"]
-                checked = self._account.check_order(entry, working)
-                if isinstance(checked, AccountRejection):
-                    assert entry.setup_key is not None  # planner entries carry their key
-                    self.pending.append(
-                        EntryRejected(entry.setup_key, entry.placed_at, checked.message)
-                    )
-                    continue
-                self.book = book.submit_bracket(entry, intent.stop, intent.targets)
-            elif isinstance(intent, ModifyOrder):
-                if book.order(intent.client_id) is not None:
-                    self.book = book.modify(intent.client_id, intent.price, intent.at)
-            elif isinstance(intent, CancelOrder):
-                if intent.client_id in book.orders:
-                    self.book = book.cancel(intent.client_id, intent.at)
-            else:
-                order = intent.order
-                if order.setup_key in book.trades and order.client_id not in book.orders:
-                    self.book = book.submit_exit(order)
+        """Send planner intents to the Paper_Broker; a refused entry goes to the next step."""
+        self.pending.extend(self.broker.route(intents))
 
 
 # ---------------------------------------------------------------- run_backtest
@@ -1039,7 +1056,8 @@ def _require_new_run_dir(out_dir: Path) -> None:
         )
 
 
-def _fees(cfg: StrategyConfig, instruments: Sequence[str]) -> dict[str, Money]:
+def trading_fees(cfg: StrategyConfig, instruments: Sequence[str]) -> dict[str, Money]:
+    """Commission plus exchange fee per contract of each instrument; exit 2 when one is unset."""
     out: dict[str, Money] = {}
     missing: list[str] = []
     for instrument in instruments:
@@ -1147,7 +1165,7 @@ def run_backtest(
     calendar = calendars.exchange.sessions
     params = EngineParams.from_sections(cfg)
     instruments = params.instruments
-    fees = _fees(cfg, instruments)
+    fees = trading_fees(cfg, instruments)
     target = Path(out_dir).expanduser()
     _require_new_run_dir(target)
     resolved_seed = resolve_seed(seed)
@@ -1224,7 +1242,9 @@ def run_backtest(
         log_path = run_dir / DECISION_LOG_FILE_NAME
         with DecisionLog(writer, log_path) as log:
             rec.output(log_path)
-            loop = _Loop(cfg, engine, account, calendar, log, shadow_mode)
+            loop = SessionLoop(
+                cfg, engine, PaperBroker(cfg.fills, account), calendar, log, shadow_mode
+            )
             todo = [c for c in checks if not c.skip]
             loaded = (
                 _replayed([replays[c.session] for c in todo], params.node_params)
@@ -1411,7 +1431,7 @@ def _report_inputs(
     enabled: Sequence[str],
     holdout: HoldoutPeriod | None,
     evaluated: Sequence[date],
-    loop: _Loop,
+    loop: SessionLoop,
     intervals: BootstrapIntervals,
 ) -> JsonValue:
     """What ``fse report`` reads besides the trades and the Gate_Funnel (Req 20.15, 18.11)."""

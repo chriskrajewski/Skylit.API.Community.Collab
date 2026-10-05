@@ -295,6 +295,26 @@
     "30.4 Write property test for promotion": {
       "status": "passed",
       "lastRunTimestamp": 1791155507790
+    },
+    "33.6 Write property test for paper isolation": {
+      "status": "passed",
+      "lastRunTimestamp": 1791166338917
+    },
+    "33.7 Write property test for the stale-map guard": {
+      "status": "passed",
+      "lastRunTimestamp": 1791166338917
+    },
+    "33.8 Write property test for replay parity": {
+      "status": "passed",
+      "lastRunTimestamp": 1791166338917
+    },
+    "33.9 Write property test for card completeness": {
+      "status": "passed",
+      "lastRunTimestamp": 1791166338917
+    },
+    "33.10 Write property test for the send schedule": {
+      "status": "passed",
+      "lastRunTimestamp": 1791166338917
     }
   },
   "executionHistory": {

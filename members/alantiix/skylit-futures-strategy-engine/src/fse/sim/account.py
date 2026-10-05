@@ -60,9 +60,11 @@ __all__ = [
     "AccountEvent",
     "AccountRejection",
     "AccountSim",
+    "AccountSnapshot",
     "AttemptEnded",
     "AttemptOutcome",
     "AttemptResult",
+    "AttemptSnapshot",
     "AttemptStarted",
     "FlatDeadlineClose",
     "ForcedExit",
@@ -249,6 +251,39 @@ class _Attempt:
     ended_ns: Instant | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class AttemptSnapshot:
+    """A frozen copy of the running or last Combine_Attempt (for :class:`AccountSnapshot`)."""
+
+    number: int
+    first_session: date
+    balance: Money
+    mll_floor: Money | None
+    profit_target: Money
+    best_day: Money | None
+    outcome: AttemptOutcome | None
+    ended_ns: Instant | None
+
+
+@dataclass(frozen=True, slots=True)
+class AccountSnapshot:
+    """Everything an :class:`AccountSim` holds, frozen, so a live Paper_Broker can resume.
+
+    ``lots`` lists each instrument's open lots as ``(sign, qty, price)`` and
+    ``marks`` the last seen close per instrument, both in insertion order.
+    """
+
+    results: tuple[AttemptResult, ...]
+    attempt: AttemptSnapshot | None
+    session: date | None
+    last_session: date | None
+    finished: bool
+    lots: tuple[tuple[str, tuple[tuple[int, int, Ticks], ...]], ...]
+    marks: tuple[tuple[str, Ticks], ...]
+    day_pnl: Money
+    dll_hit: bool
+
+
 def _require_instrument(instrument: str) -> None:
     if instrument not in TICK_VALUE_USD:
         raise ValueError(
@@ -366,6 +401,77 @@ class AccountSim:
         return sum(
             MICRO_EQUIVALENTS[i] * sum(lot.qty for lot in lots) for i, lots in self._lots.items()
         )
+
+    # ---------------------------------------------------------------- snapshots
+
+    def snapshot(self) -> AccountSnapshot:
+        """The simulator's whole state, frozen (the config, calendar and fees excluded)."""
+        a = self._attempt
+        attempt = (
+            None
+            if a is None
+            else AttemptSnapshot(
+                a.number,
+                a.first_session,
+                a.balance,
+                a.mll_floor,
+                a.profit_target,
+                a.best_day,
+                a.outcome,
+                a.ended_ns,
+            )
+        )
+        return AccountSnapshot(
+            results=tuple(self._results),
+            attempt=attempt,
+            session=self._session,
+            last_session=self._last_session,
+            finished=self._finished,
+            lots=tuple(
+                (i, tuple((lot.sign, lot.qty, lot.price) for lot in lots))
+                for i, lots in self._lots.items()
+            ),
+            marks=tuple(self._marks.items()),
+            day_pnl=self._day_pnl,
+            dll_hit=self._dll_hit,
+        )
+
+    @classmethod
+    def restore(
+        cls,
+        cfg: AccountConfig,
+        calendar: SessionCalendar,
+        fee_per_contract: Mapping[str, Money],
+        snap: AccountSnapshot,
+    ) -> AccountSim:
+        """A simulator in the state ``snap`` recorded, under the same config, calendar and fees."""
+        sim = cls(cfg, calendar, fee_per_contract)
+        a = snap.attempt
+        sim._results = list(snap.results)
+        sim._attempt = (
+            None
+            if a is None
+            else _Attempt(
+                a.number,
+                a.first_session,
+                a.balance,
+                a.mll_floor,
+                a.profit_target,
+                a.best_day,
+                a.outcome,
+                a.ended_ns,
+            )
+        )
+        sim._session = snap.session
+        sim._last_session = snap.last_session
+        sim._finished = snap.finished
+        for instrument, lots in snap.lots:
+            _require_instrument(instrument)
+            sim._lots[instrument] = [_Lot(sign, qty, price) for sign, qty, price in lots]
+        sim._marks = dict(snap.marks)
+        sim._day_pnl = snap.day_pnl
+        sim._dll_hit = snap.dll_hit
+        return sim
 
     # ---------------------------------------------------------------- trading days
 

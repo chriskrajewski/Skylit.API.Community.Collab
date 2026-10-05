@@ -158,7 +158,9 @@ class HistoricalInputs:
     ``symbols`` and ``metrics`` fix the Map_State keys and their order;
     ``view_id`` is the configured Heatmap_View's id. ``dark_pool`` maps each
     ticker whose prints were fetched for the session to those prints; a ticker
-    that is absent was not fetched. Raises ``ValueError`` for inputs of the
+    that is absent was not fetched. ``dark_pool_fetched_at`` (replay) gives,
+    per ticker, the receipt time of its first fetch: before it, the ticker
+    counts as not fetched, as in :class:`LiveInputs`. Raises ``ValueError`` for inputs of the
     wrong type, repeated keys, VIX bars that are not 1-minute bars, dark-pool
     prints filed under another ticker, or a prior VIX record that is not
     before the session's record.
@@ -167,6 +169,7 @@ class HistoricalInputs:
     __slots__ = (
         "_bars",
         "_dark_pool",
+        "_dark_pool_since",
         "_events",
         "_keys",
         "_snapshots",
@@ -189,6 +192,7 @@ class HistoricalInputs:
         vix_bars: Iterable[Bar | Received[Bar]] = (),
         dark_pool: Mapping[str, Iterable[DarkPoolPrint | Received[DarkPoolPrint]]] | None = None,
         events: Iterable[EconomicEvent] = (),
+        dark_pool_fetched_at: Mapping[str, Instant] | None = None,
     ) -> None:
         self._keys: tuple[SymMetric, ...] = _map_keys(symbols, metrics)
         self._view_id = _check_view_id(view_id)
@@ -234,6 +238,7 @@ class HistoricalInputs:
                         f"dark_pool[{ticker!r}][{i}] is a print for {p.ticker!r}, not {ticker!r}"
                     )
             self._dark_pool[ticker] = AsOfIndex.of(items, observation_time)
+        self._dark_pool_since: dict[str, Instant] = dict(dark_pool_fetched_at or {})
 
         evs = [_require(f"events[{i}]", e, EconomicEvent) for i, e in enumerate(events)]
         self._events: tuple[EconomicEvent, ...] = tuple(
@@ -329,7 +334,8 @@ class _IndexedView:
 
     def dark_pool(self, ticker: str, since: Instant) -> Sequence[DarkPoolPrint] | Unavailable:
         index = self._in._dark_pool.get(ticker)
-        if index is None:
+        first = self._in._dark_pool_since.get(ticker)
+        if index is None or (first is not None and first > self._t):
             return Unavailable(f"{ticker} dark-pool prints were not fetched for the session")
         return tuple(index.between(self._t, since, self._t))
 
@@ -386,6 +392,7 @@ class LiveInputs:
         "_bars",
         "_capacity",
         "_dark_pool",
+        "_dark_pool_since",
         "_events",
         "_keys",
         "_raw_prior",
@@ -415,6 +422,7 @@ class LiveInputs:
         self._bars: dict[tuple[str, int], RingIndex[Bar]] = {}
         self._vix_bars: RingIndex[Bar] = RingIndex(capacity)
         self._dark_pool: dict[str, RingIndex[DarkPoolPrint]] = {}
+        self._dark_pool_since: dict[str, Instant] = {}
         evs = [_require(f"events[{i}]", e, EconomicEvent) for i, e in enumerate(events)]
         self._events: tuple[EconomicEvent, ...] = tuple(
             sorted(evs, key=lambda e: (e.release_ns, e.event_type))
@@ -478,7 +486,11 @@ class LiveInputs:
     def add_dark_pool(
         self, ticker: str, prints: Iterable[DarkPoolPrint], received_ns: Instant
     ) -> None:
-        """Append one fetch of ``ticker``'s prints; the ticker counts as fetched from now on."""
+        """Append one fetch of ``ticker``'s prints; the ticker counts as fetched from now on.
+
+        "From now on" is from the first fetch's receipt time: a view at an
+        earlier ``t`` still reports the ticker as not fetched.
+        """
         if not isinstance(ticker, str) or not ticker.strip():
             raise ValueError(f"ticker must be a non-blank string, got {ticker!r}")
         items = list(prints)
@@ -489,6 +501,7 @@ class LiveInputs:
         ring = self._dark_pool.get(ticker)
         if ring is None:
             ring = self._dark_pool[ticker] = RingIndex(self._capacity)
+            self._dark_pool_since[ticker] = received_ns
         for p in items:
             ring.append(p, observation_time(p), received_ns)
 
