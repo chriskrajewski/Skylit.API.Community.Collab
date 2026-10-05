@@ -18,6 +18,16 @@ is a separate task: it delivers each message to each sink within
 Log_Writer (``notifier.jsonl``, plus one stderr line) and the next message
 goes on; nothing in the order path reads the Notifier.
 
+**Narrator** (Req 25.10-25.12, ``notify.narrator.enabled``). Before a
+Finding_Card goes to the sinks, :meth:`deliver` hands its
+:attr:`Message.narrator_fields` to the :class:`~fse.notify.narrator.Narrator`.
+With prose, the one message sent holds the prose and the unchanged card
+(text: the prose, a blank line, the card text; JSON: ``{"narration",
+"card"}``). Without prose, it holds the unchanged card and
+:data:`~fse.notify.narrator.NARRATION_UNAVAILABLE` (JSON: ``{"narration":
+null, "narration_note", "card"}``), and the cause is logged. 2R alerts are not
+narrated. With the Narrator off, messages go out exactly as queued.
+
 Every sent message is also kept in :attr:`Notifier.sent` order for tests and
 the run summary.
 """
@@ -38,6 +48,7 @@ from fse.live._wait import TIMED_OUT, within
 from fse.logio import LogWriter
 from fse.logio.canonical_json import JsonValue, ny_iso
 from fse.notify.finding_card import Alert2R, FindingCard, render_alert, render_card
+from fse.notify.narrator import NARRATION_UNAVAILABLE, Narrator
 from fse.secrets.env import EnvView
 from fse.timekit import NS_PER_SECOND
 
@@ -59,15 +70,22 @@ DELIVERY_TIMEOUT_S: Final = 10
 
 @dataclass(frozen=True, slots=True)
 class Message:
-    """One Finding_Card or 2R alert, as text and as JSON."""
+    """One Finding_Card or 2R alert, as text and as JSON.
+
+    ``narrator_fields`` is the card's Narrator input; ``None`` for an alert and
+    for a message that was already narrated.
+    """
 
     kind: str
     text: str
     body: dict[str, JsonValue]
+    narrator_fields: dict[str, JsonValue] | None = None
 
     @classmethod
     def card(cls, card: FindingCard) -> Message:
-        return cls(f"card:{card.kind}", render_card(card), card.to_jsonable())
+        return cls(
+            f"card:{card.kind}", render_card(card), card.to_jsonable(), card.to_narrator_fields()
+        )
 
     @classmethod
     def alert(cls, alert: Alert2R) -> Message:
@@ -80,7 +98,17 @@ type Sink = Callable[[Message], Awaitable[None]]
 class Notifier:
     """Queues messages and delivers them in its own task (see the module notes)."""
 
-    __slots__ = ("_clock", "_closed", "_http", "_log_path", "_queue", "_sinks", "_writer", "sent")
+    __slots__ = (
+        "_clock",
+        "_closed",
+        "_http",
+        "_log_path",
+        "_narrator",
+        "_queue",
+        "_sinks",
+        "_writer",
+        "sent",
+    )
 
     def __init__(
         self,
@@ -113,6 +141,9 @@ class Notifier:
                 else:
                     sinks.append((name, self._webhook_sink(url.strip())))
         self._sinks: tuple[tuple[str, Sink], ...] = tuple(sinks)
+        self._narrator = (
+            Narrator(cfg.narrator, env, writer, clock, http=http) if cfg.narrator.enabled else None
+        )
 
     @property
     def sink_names(self) -> tuple[str, ...]:
@@ -135,9 +166,32 @@ class Notifier:
             message = await self._queue.get()
             if message is None:
                 return
-            for name, sink in self._sinks:
-                await self._deliver(name, sink, message)
-            self.sent.append(message)
+            await self.deliver(message)
+
+    async def deliver(self, message: Message) -> Message:
+        """Narrate ``message`` (when on) and deliver it to each sink; the message sent."""
+        if self._narrator is not None and message.narrator_fields is not None:
+            message = await self._narrated(self._narrator, message)
+        for name, sink in self._sinks:
+            await self._deliver(name, sink, message)
+        self.sent.append(message)
+        return message
+
+    async def _narrated(self, narrator: Narrator, message: Message) -> Message:
+        assert message.narrator_fields is not None
+        narration = await narrator.narrate(message.narrator_fields)
+        if narration.prose is not None:
+            return Message(
+                message.kind,
+                f"{narration.prose}\n\n{message.text}",
+                {"narration": narration.prose, "card": message.body},
+            )
+        self._log({"event": "narration_failed", "message": message.kind, "cause": narration.cause})
+        return Message(
+            message.kind,
+            f"{message.text}\nNarration: {NARRATION_UNAVAILABLE}",
+            {"narration": None, "narration_note": NARRATION_UNAVAILABLE, "card": message.body},
+        )
 
     async def _deliver(self, name: str, sink: Sink, message: Message) -> None:
         try:
@@ -184,7 +238,9 @@ class Notifier:
         return deliver
 
     async def aclose(self) -> None:
-        """Close the HTTP client, if one was opened."""
+        """Close the HTTP client, if one was opened, and the Narrator's."""
+        if self._narrator is not None:
+            await self._narrator.aclose()
         if self._http is not None:
             await self._http.aclose()
 

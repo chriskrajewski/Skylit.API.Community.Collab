@@ -335,6 +335,14 @@
     "35.8 Write property test for reconciliation": {
       "status": "passed",
       "lastRunTimestamp": 1791173482596
+    },
+    "36.2 Write property test for Narrator input and fallback": {
+      "status": "passed",
+      "lastRunTimestamp": 1791176058070
+    },
+    "36.3 Write property test for observer independence": {
+      "status": "passed",
+      "lastRunTimestamp": 1791176058070
     }
   },
   "executionHistory": {

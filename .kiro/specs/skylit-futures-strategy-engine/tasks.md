@@ -1075,8 +1075,8 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
       - halt within one cadence, and a restart with persisted blocks
     - _Requirements: 24.1, 24.3, 24.9, 24.10, 24.12, 24.18, 24.19, 24.21, 24.22, 24.26, 24.27_
 
-- [ ] 36. Optional Narrator
-  - [ ] 36.1 Implement the Narrator and its prompt
+- [x] 36. Optional Narrator
+  - [x] 36.1 Implement the Narrator and its prompt
     - `src/fse/notify/narrator.py` and `prompts/narrator.md`:
       - Narrator input comes from `to_narrator_fields()`, an allow-list with no account ids, passed through the Redactor
       - `NARRATOR_API_KEY` is read from `EnvView`
@@ -1085,11 +1085,11 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
     - Wire the Narrator into `src/fse/notify/notifier.py` only. Leave `src/fse/live/runner.py` unchanged
     - _Requirements: 25.10, 25.11, 25.12, 25.13, 25.15, 26.13, 26.14_
 
-  - [ ] 36.2 Write property test for Narrator input and fallback
+  - [x] 36.2 Write property test for Narrator input and fallback
     - **Property 82: Narrator input and fallback**
     - **Validates: Requirements 25.10, 25.12**
 
-  - [ ] 36.3 Write property test for observer independence
+  - [x] 36.3 Write property test for observer independence
     - **Property 73: Observer independence**
     - **Validates: Requirements 23.10, 25.14, 25.15**
 

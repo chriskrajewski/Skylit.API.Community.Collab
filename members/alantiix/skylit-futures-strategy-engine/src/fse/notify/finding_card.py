@@ -36,6 +36,9 @@ flip, :class:`~fse.engine.step.CardTriggers`), when ``notify.interval_min``
 has passed since the last sent card, or when no card was sent yet (the first
 card carries the start notes). One card at most per Decision_Time.
 
+**Narrator input** (:meth:`FindingCard.to_narrator_fields`, Req 25.10): the
+card's :data:`NARRATOR_FIELDS` only, an allow-list without ``notes``.
+
 Nothing here reads a clock, a secret or a broker account id.
 """
 
@@ -62,6 +65,7 @@ __all__ = [
     "CARD_REASON_LIMIT",
     "CARD_SETUP_LIMIT",
     "FLAT",
+    "NARRATOR_FIELDS",
     "NONE",
     "TRINITY_SYMBOLS",
     "UNAVAILABLE",
@@ -91,6 +95,28 @@ FLAT: Final = "flat"
 CARD_SETUP_LIMIT: Final = 5
 CARD_REASON_LIMIT: Final = 3
 TRINITY_SYMBOLS: Final[tuple[str, ...]] = ("SPX", "SPY", "QQQ")
+NARRATOR_FIELDS: Final[tuple[str, ...]] = (
+    "kind",
+    "decision_time_ny",
+    "order_mode",
+    "map",
+    "spot",
+    "king_flips",
+    "regime",
+    "map_grade",
+    "trinity",
+    "setups",
+    "setups_not_listed",
+    "working_orders",
+    "armed",
+    "cancelled",
+    "positions",
+    "watch",
+)
+"""The card fields the Narrator gets (Req 25.10): built by code, holding no account id.
+
+``notes`` is left out: it is free text that can quote a broker reply.
+"""
 _TRINITY_METRIC: Final = "gamma"
 _GRADE_RANK: Final[Mapping[Grade, int]] = {"A_Plus": 0, "Alert_2R": 1, "Pass": 2}
 
@@ -292,6 +318,11 @@ class FindingCard:
             "watch": [w.to_jsonable() for w in self.watch],
             "notes": _listed(list(self.notes)),
         }
+
+    def to_narrator_fields(self) -> dict[str, JsonValue]:
+        """The :data:`NARRATOR_FIELDS` of :meth:`to_jsonable`, the only Narrator input."""
+        card = self.to_jsonable()
+        return {name: card[name] for name in NARRATOR_FIELDS}
 
 
 def _listed[T](items: list[T]) -> list[T] | str:
