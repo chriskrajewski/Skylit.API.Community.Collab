@@ -1010,7 +1010,7 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
       - an unreadable state that blocks entries until clear
     - _Requirements: 16.7, 16.10, 23.2, 23.3, 23.4, 23.6, 23.11, 23.12, 23.14_
 
-- [ ] 34. Checkpoint - Paper run ready
+- [x] 34. Checkpoint - Paper run ready
   - Ensure all tests pass, ask the user if questions arise.
   - Operator (optional): run `fse paper --config configs/playbook_baseline.yaml` during RTH. Paper Order_Mode sends no broker orders.
 
