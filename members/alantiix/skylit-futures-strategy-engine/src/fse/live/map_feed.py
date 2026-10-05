@@ -18,7 +18,8 @@ while a refresh was running is not made up).
 connections, one per metric, each for every configured symbol; every
 ``snapshot`` event is delivered and no polling request is sent. A connection
 is reopened with the id of the last event received (the ``Last-Event-ID``
-header) when it closes, fails to open, sends a ``reconnect`` or ``closed``
+header) when it closes (cleanly or by a transport error while the body is
+read), fails to open, sends a ``reconnect`` or ``closed``
 event, or sends no event for 60 s (:data:`STREAM_SILENCE_S`); comment lines do
 not count as events. A reconnect is attempted at most once per 5 s
 (:data:`RECONNECT_MIN_GAP_S`), until the stream resumes or the run window
@@ -258,6 +259,8 @@ class MapFeed:
                     if reason is not None:
                         return reason, last_id
         except SkylitStreamError as exc:
+            if exc.dropped:
+                return f"connection dropped: {exc.cause}", last_id
             return f"open failed: {exc.cause}", last_id
 
     def _handle(self, metric: Metric, message: SseMessage) -> str | None:

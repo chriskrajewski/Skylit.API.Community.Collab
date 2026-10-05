@@ -46,8 +46,9 @@ What one :class:`SkylitClient` does for every request:
 ``GET /v1/stream`` connection under the same key check, limits bootstrap,
 pacing, Fetch_Log line and 401/402/403 stop, and yields its server-sent
 events (:mod:`fse.skylit.sse`). It is never retried here: any other failure to
-open raises :class:`SkylitStreamError`, and the Live_Runner's map feed decides
-when to reconnect. ``last_event_id`` goes in the ``Last-Event-ID`` header.
+open raises :class:`SkylitStreamError`, and so does a transport error while the
+body is read (with ``dropped`` set); the Live_Runner's map feed decides when
+to reconnect. ``last_event_id`` goes in the ``Last-Event-ID`` header.
 
 Results: a 2xx is a :class:`Response` (decoded JSON body); a request that
 failed for good (Req 2.8) or was refused without a retry (Req 2.9) is a
@@ -175,11 +176,14 @@ class SkylitStoppedError(SkylitAccessError):
 
 
 class SkylitStreamError(Exception):
-    """``GET /v1/stream`` did not open: another HTTP status, a timeout or a network error."""
+    """``GET /v1/stream`` did not open (another HTTP status, a timeout or a network
+    error), or, with ``dropped``, an open connection failed while its body was read."""
 
-    def __init__(self, cause: str) -> None:
+    def __init__(self, cause: str, *, dropped: bool = False) -> None:
         self.cause = cause
-        super().__init__(f"GET /v1/stream did not open: {cause}")
+        self.dropped = dropped
+        what = "dropped" if dropped else "did not open"
+        super().__init__(f"GET /v1/stream {what}: {cause}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -511,7 +515,7 @@ class SkylitClient:
             status = response.status_code
             code = None
             if not 200 <= status <= 299:
-                code = _safe_code(error_code_of(_json_body(await response.aread())))
+                code = _safe_code(error_code_of(_json_body(await _read_body(response))))
             result = HttpResult(status, RateHeaders.parse(response.headers, received_at), code)
             self._limiter.observe(result.headers)
             decision = self._log_stream_open(sent_at, query, result)
@@ -692,11 +696,30 @@ class SkylitClient:
         return HttpResult(status, RateHeaders.parse(response.headers, received_at), code), body
 
 
+async def _read_body(response: httpx.Response) -> bytes:
+    """The body of a non-2xx stream open; empty when the connection fails mid-body.
+
+    The status is already known, so the 401/402/403 stop and the open failure
+    still apply; only the error code from the body is lost.
+    """
+    try:
+        return await response.aread()
+    except httpx.HTTPError, httpx.StreamError:
+        return b""
+
+
 async def _sse_messages(
     response: httpx.Response, last_event_id: str | None
 ) -> AsyncIterator[SseMessage]:
     decoder = SseDecoder(last_event_id)
-    async for line in response.aiter_lines():
+    lines = response.aiter_lines()
+    while True:
+        try:
+            line = await anext(lines)
+        except StopAsyncIteration:
+            return
+        except (httpx.HTTPError, httpx.StreamError) as exc:
+            raise SkylitStreamError(type(exc).__name__, dropped=True) from None
         message = decoder.feed(line.rstrip("\r\n"))
         if message is not None:
             yield message
