@@ -3,3 +3,4 @@ members/alantiix/skylit-academy-playbook-skill/skill-fine-tune/README.md !filter
 members/alantiix/skylit-academy-playbook-skill/skill-fine-tune-wip/** filter=git-crypt diff=git-crypt
 members/alantiix/skylit-academy-playbook-skill/skill-fine-tune-wip/README.md !filter !diff
 members/alantiix/skylit-futures-strategy-engine/** filter=git-crypt diff=git-crypt
+.kiro/** filter=git-crypt diff=git-crypt
