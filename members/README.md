@@ -24,6 +24,8 @@
 | Member | Projects |
 | --- | --- |
 | [alantiix](alantiix/README.md) | [skylit-academy-playbook-skill](alantiix/skylit-academy-playbook-skill/README.md) · [skylit-knowledgebase](alantiix/skylit-knowledgebase/README.md) |
+| [Anubis](Anubis/SirFartalot-Backtest-Study.md) | [SirFartalot-Backtest-Study](Anubis/SirFartalot-Backtest-Study.md) · [Vex_Stairup-down](Anubis/Vex_Stairup-down/vex_stair_grok.py) |
+| [dashingbixby](dashingbixby/README.md) | [recorder](dashingbixby/recorder/README.md) |
 | [raked](raked/README.md) | [mnq-gamma-node](raked/mnq-gamma-node/README.md) |
 
 ## How this is organized
