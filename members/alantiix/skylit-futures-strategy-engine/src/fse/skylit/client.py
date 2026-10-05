@@ -42,6 +42,13 @@ What one :class:`SkylitClient` does for every request:
    sends nothing: every later call, and every call already waiting for a send
    slot, raises the same error.
 
+**Stream** (Req 23.3-23.4). :meth:`SkylitClient.stream` opens one
+``GET /v1/stream`` connection under the same key check, limits bootstrap,
+pacing, Fetch_Log line and 401/402/403 stop, and yields its server-sent
+events (:mod:`fse.skylit.sse`). It is never retried here: any other failure to
+open raises :class:`SkylitStreamError`, and the Live_Runner's map feed decides
+when to reconnect. ``last_event_id`` goes in the ``Last-Event-ID`` header.
+
 Results: a 2xx is a :class:`Response` (decoded JSON body); a request that
 failed for good (Req 2.8) or was refused without a retry (Req 2.9) is a
 :class:`Failed`, and the caller continues with its next request. The typed
@@ -58,10 +65,11 @@ like a code (letters, digits, ``_.:-``, at most 64 characters).
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import random
 import re
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import AsyncIterator, Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import date
 from types import MappingProxyType, TracebackType
@@ -91,12 +99,14 @@ from fse.skylit.ratelimit import DEFAULT_LOW_WATER, RateHeaders, RateLimiter
 from fse.skylit.retry import (
     Action,
     AttemptResult,
+    Decision,
     ErrorKind,
     HttpResult,
     TransportFailure,
     decide,
     error_code_of,
 )
+from fse.skylit.sse import SseDecoder, SseMessage
 from fse.timekit import Instant
 
 __all__ = [
@@ -115,6 +125,7 @@ __all__ = [
     "SkylitClient",
     "SkylitKeyMissingError",
     "SkylitStoppedError",
+    "SkylitStreamError",
 ]
 
 # Design "Exit codes": 3 = credentials or access (blank SKYLIT_API_KEY, Skylit 401/402/403).
@@ -161,6 +172,14 @@ class SkylitStoppedError(SkylitAccessError):
             f"no further Skylit request will be sent. Check {KEY_VARIABLE}, the account's "
             "credits and its API access."
         )
+
+
+class SkylitStreamError(Exception):
+    """``GET /v1/stream`` did not open: another HTTP status, a timeout or a network error."""
+
+    def __init__(self, cause: str) -> None:
+        self.cause = cause
+        super().__init__(f"GET /v1/stream did not open: {cause}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -442,6 +461,90 @@ class SkylitClient:
         )
         return await self._typed(ep.ATLAS_HISTORY, params, parse_atlas_history)
 
+    @contextlib.asynccontextmanager
+    async def stream(
+        self, params: Mapping[str, str], *, last_event_id: str | None = None
+    ) -> AsyncIterator[AsyncIterator[SseMessage]]:
+        """Open ``GET /v1/stream`` with ``params`` and yield its events (see the module notes).
+
+        ``params`` come from :func:`fse.skylit.endpoints.stream_params`. Raises
+        :class:`SkylitKeyMissingError` or :class:`SkylitStoppedError` as
+        :meth:`get` does, and :class:`SkylitStreamError` when the connection
+        does not open with a 2xx. The connection closes when the block exits.
+        """
+        endpoint = ep.STREAM
+        key = self._require_key()
+        await self._ensure_limits(key)
+        sent_at = await self._limiter.acquire()
+        self._raise_if_stopped()
+        self._sent += 1
+        headers = {
+            "Authorization": f"Bearer {key}",
+            "Accept": "text/event-stream",
+            "Cache-Control": "no-cache",
+        }
+        if last_event_id:
+            headers["Last-Event-ID"] = last_event_id
+        query = dict(params)
+        opened = self._cfg.request_timeout_s
+        request = self._http.build_request(
+            "GET",
+            endpoint.url,
+            params=query,
+            headers=headers,
+            timeout=httpx.Timeout(opened, read=None),
+        )
+        result: AttemptResult
+        try:
+            async with asyncio.timeout(opened):
+                response = await self._http.send(request, stream=True)
+        except (httpx.TimeoutException, TimeoutError) as exc:
+            result = TransportFailure(ErrorKind.TIMEOUT, type(exc).__name__)
+            self._log_stream_open(sent_at, query, result)
+            raise SkylitStreamError(type(exc).__name__) from None
+        except (httpx.HTTPError, httpx.StreamError) as exc:
+            result = TransportFailure(ErrorKind.NETWORK, type(exc).__name__)
+            self._log_stream_open(sent_at, query, result)
+            raise SkylitStreamError(type(exc).__name__) from None
+        try:
+            received_at = self._clock.now()
+            status = response.status_code
+            code = None
+            if not 200 <= status <= 299:
+                code = _safe_code(error_code_of(_json_body(await response.aread())))
+            result = HttpResult(status, RateHeaders.parse(response.headers, received_at), code)
+            self._limiter.observe(result.headers)
+            decision = self._log_stream_open(sent_at, query, result)
+            if decision.action is Action.STOPPED:
+                self._stopped = SkylitStoppedError(status, code, endpoint.host, endpoint.path)
+                self._raise_if_stopped()
+            if not 200 <= status <= 299:
+                if decision.action is Action.RETRY and decision.hold_all:
+                    self._limiter.hold_until(received_at + decision.wait_ns)
+                raise SkylitStreamError(f"HTTP {status}" + (f" ({code})" if code else ""))
+            yield _sse_messages(response, last_event_id)
+        finally:
+            await response.aclose()
+
+    def _log_stream_open(
+        self, sent_at: Instant, params: Mapping[str, str], result: AttemptResult
+    ) -> Decision:
+        received_at = self._clock.now()
+        decision = decide(result, 1, now=received_at, rng=self._rng)
+        self._fetch_log.record(
+            FetchLogEntry.from_attempt(
+                sent_at=sent_at,
+                host=ep.STREAM.host.value,
+                path=ep.STREAM.path,
+                params=params,
+                attempt=1,
+                result=result,
+                decision=decision,
+                duration_ns=max(0, received_at - sent_at),
+            )
+        )
+        return decision
+
     # ------------------------------------------------------------ lifecycle
 
     async def aclose(self) -> None:
@@ -587,6 +690,16 @@ class SkylitClient:
         status = response.status_code
         code = None if 200 <= status <= 299 else _safe_code(error_code_of(body))
         return HttpResult(status, RateHeaders.parse(response.headers, received_at), code), body
+
+
+async def _sse_messages(
+    response: httpx.Response, last_event_id: str | None
+) -> AsyncIterator[SseMessage]:
+    decoder = SseDecoder(last_event_id)
+    async for line in response.aiter_lines():
+        message = decoder.feed(line.rstrip("\r\n"))
+        if message is not None:
+            yield message
 
 
 def _parse_or_fail[T](

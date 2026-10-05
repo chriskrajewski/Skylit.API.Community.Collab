@@ -103,6 +103,19 @@ MAE and MFE included), ``combine_attempts.json``, ``session_outcomes.json``,
 ``shadow_trades.csv``, ``gate_funnel.json``, ``report_inputs.json`` and
 ``run_manifest.json``.
 
+**Replay mode** (design §18 step 6, Req 23.9). ``mode="replay"`` runs the
+range's sessions that have a live recording in ``recordings``
+(:mod:`fse.backtest.replay`). Each input is available at
+``max(Observation_Time, receipt_time)``, the Decision_Times are the recorded
+ones, and each Decision_Time's recorded guard blocks go to ``Engine.step`` as
+``external_blocks``. A bar goes through the bar phase at the first recorded
+Decision_Time at or after it became available; the bars released together
+run in (open, instrument) order. Everything else (account rules, the
+Flat_Deadline, shadow trades, outputs) is the historical run's. The
+recordings are read and checked before the Run_Manifest opens, so an
+unreadable one (exit 4) writes nothing. The Run_Manifest kind is
+``replay``.
+
 **Determinism** (Req 18.5). Nothing in the loop reads a clock or draws a
 random number; the manifest clock is injected. Equal inputs and seed give
 byte-identical decision logs, trade lists, Gate_Funnels and manifests, apart
@@ -141,6 +154,7 @@ from fse.backtest.manifest import (
     SkippedSession,
     run_manifest,
 )
+from fse.backtest.replay import ReplaySession, load_replay, replay_files
 from fse.backtest.shadow import SetupRecord, ShadowBook, ShadowMode
 from fse.backtest.stats import NodeAgreement, TapCounts, node_agreement, tap_counts
 from fse.calendars import load_calendars, project_calendar_dir
@@ -156,7 +170,14 @@ from fse.engine.nodes import NodeParams
 from fse.engine.planner import CancelOrder, ModifyOrder, OrderFill, OrderIntent, PlaceBracket
 from fse.engine.risk import RiskFill
 from fse.engine.state import EngineState
-from fse.engine.step import BarPhaseResult, Engine, EngineParams, EntryRejected, StepEvent
+from fse.engine.step import (
+    BarPhaseResult,
+    Engine,
+    EngineParams,
+    EntryRejected,
+    ExternalBlock,
+    StepEvent,
+)
 from fse.engine.taps import BASE_INTERVAL_S
 from fse.engine.types import (
     Bar,
@@ -190,6 +211,7 @@ __all__ = [
     "BACKTEST_KIND",
     "BACKTEST_OUTPUT_FILES",
     "FUNNEL_FILE_NAME",
+    "REPLAY_KIND",
     "REPORT_INPUTS_FILE_NAME",
     "SESSION_OUTCOMES_FILE_NAME",
     "SETUPS_FILE_NAME",
@@ -218,6 +240,7 @@ __all__ = [
 ]
 
 BACKTEST_KIND: Final = "backtest"
+REPLAY_KIND: Final = "replay"
 TRADES_CSV_FILE_NAME: Final = "trades.csv"
 TRADES_JSON_FILE_NAME: Final = "trades.json"
 ATTEMPTS_FILE_NAME: Final = "combine_attempts.json"
@@ -419,12 +442,19 @@ class _LoadSpec:
 
 @dataclass(frozen=True, slots=True)
 class _Session:
-    """One session's indexed inputs, its futures bars in open-time order and its agreement."""
+    """One session's indexed inputs, its futures bars in open-time order and its agreement.
+
+    A replayed session also carries when each bar became available, the
+    recorded Decision_Times and the recorded guard blocks per Decision_Time.
+    """
 
     session: date
     inputs: HistoricalInputs
     bars: tuple[Bar, ...]
     agreement: NodeAgreement
+    bar_available: tuple[Instant, ...] | None = None
+    times: tuple[Instant, ...] | None = None
+    blocks: Mapping[Instant, tuple[ExternalBlock, ...]] | None = None
 
 
 def _lookback_first(calendar: SessionCalendar, session: date, sessions: int) -> date:
@@ -462,9 +492,7 @@ def _load_session(cache: DataCache, check: SessionCheck, spec: _LoadSpec) -> _Se
         for ticker in spec.dark_pool_tickers:
             if session in spec.dark_pool_fetched.get(ticker, frozenset()):
                 dark_pool[ticker] = cache.darkpool.read(ticker, first, session)
-    events = tuple(
-        e for e in spec.events if session - _ONE_DAY <= e.release_date <= session + _ONE_DAY
-    )
+    events = _session_events(spec.events, session)
     inputs = HistoricalInputs(
         symbols=spec.symbols,
         view_id=spec.view_id,
@@ -478,6 +506,25 @@ def _load_session(cache: DataCache, check: SessionCheck, spec: _LoadSpec) -> _Se
     )
     agreement = node_agreement(snapshots, spec.node_params)
     return _Session(session, inputs, tuple(bars), agreement)
+
+
+def _session_events(events: Iterable[EconomicEvent], session: date) -> tuple[EconomicEvent, ...]:
+    """The calendar events dated the day before, the day of or the day after ``session``."""
+    return tuple(e for e in events if session - _ONE_DAY <= e.release_date <= session + _ONE_DAY)
+
+
+def _replayed(replays: Sequence[ReplaySession], node_params: NodeParams) -> Generator[_Session]:
+    """Each recorded session as a loop session (replay mode)."""
+    for r in replays:
+        yield _Session(
+            r.session,
+            r.inputs,
+            r.bars,
+            node_agreement(r.snapshots, node_params),
+            bar_available=r.bar_available,
+            times=r.decision_times,
+            blocks=r.blocks,
+        )
 
 
 def _prefetch(
@@ -658,6 +705,35 @@ def _groups(bars: Sequence[Bar], first_open: Instant, last_close: Instant) -> li
     return out
 
 
+def _released(
+    bars: Sequence[Bar],
+    available: Sequence[Instant],
+    times: Sequence[Instant],
+    first_open: Instant,
+    last_close: Instant,
+) -> tuple[list[list[_Group]], list[_Group]]:
+    """Replay's bar phase: the groups released at each Decision_Time, and those left after.
+
+    A bar is released at the first Decision_Time at or after it became
+    available; the bars released together go through the bar phase in
+    (open, instrument) order, one group per 1-minute interval.
+    """
+    order = sorted(
+        (i for i, b in enumerate(bars) if b.open_ns >= first_open and b.close_ns <= last_close),
+        key=lambda i: (available[i], bars[i].open_ns, bars[i].instrument),
+    )
+    batches: list[list[_Group]] = []
+    j = 0
+    for t in times:
+        start = j
+        while j < len(order) and available[order[j]] <= t:
+            j += 1
+        batch = sorted((bars[i] for i in order[start:j]), key=lambda b: (b.open_ns, b.instrument))
+        batches.append(_groups(batch, first_open, last_close))
+    rest = sorted((bars[i] for i in order[j:]), key=lambda b: (b.open_ns, b.instrument))
+    return batches, _groups(rest, first_open, last_close)
+
+
 class _Loop:
     """The mutable state of one run: engine state, Fill_Simulator book and account."""
 
@@ -704,22 +780,35 @@ class _Loop:
         # The closing fills are stamped on the bar that opens at the deadline, so
         # the engine first sees them when that bar has closed (Req 5.3).
         observed = deadline + BASE_INTERVAL_S * NS_PER_SECOND
-        groups = _groups(data.bars, cal.trading_day_start(session), deadline)
+        first_open = cal.trading_day_start(session)
+        if data.times is None:
+            times = cal.decision_times(session, self._cadence_s)
+            groups = _groups(data.bars, first_open, deadline)
+            released = None
+        else:
+            times = data.times
+            assert data.bar_available is not None  # set with the times (replay)
+            released, groups = _released(data.bars, data.bar_available, times, first_open, deadline)
         i = 0
         ended = False
         held: list[tuple[Bar, FillEvent]] | None = None
-        for t in cal.decision_times(session, self._cadence_s):
+        for k, t in enumerate(times):
             view = data.inputs.view(t)
-            while i < len(groups) and groups[i].close_ns <= t:
-                self._bar_phase(groups[i], view, rth)
-                i += 1
+            if released is None:
+                while i < len(groups) and groups[i].close_ns <= t:
+                    self._bar_phase(groups[i], view, rth)
+                    i += 1
+            else:
+                for group in released[k]:
+                    self._bar_phase(group, view, rth)
             if not ended and t >= deadline:
                 held = self._end_day(data, deadline)
                 ended = True
             if held is not None and t >= observed:
                 self._deliver(held)
                 held = None
-            self._decide(view, t)
+            blocks = () if data.blocks is None else data.blocks.get(t, ())
+            self._decide(view, t, blocks)
         if not ended:
             view = data.inputs.view(deadline)
             for group in groups[i:]:
@@ -733,10 +822,12 @@ class _Loop:
         self.tap_counts.append(tap_counts(self.state.taps, session, cal))
         self.agreement += data.agreement
 
-    def _decide(self, view: HistoricalMarketView, t: Instant) -> None:
+    def _decide(
+        self, view: HistoricalMarketView, t: Instant, blocks: Sequence[ExternalBlock] = ()
+    ) -> None:
         events = tuple(self.pending)
         self.pending.clear()
-        result = self._engine.step(self.state, view, t, events)
+        result = self._engine.step(self.state, view, t, events, blocks)
         self.state = result.state
         self._route(result.intents)
         self._log.write(result.payload)
@@ -985,6 +1076,7 @@ def run_backtest(
     shadow_mode: ShadowMode = "rejected",
     only_sessions: Collection[date] | None = None,
     bootstrap_resamples: int | None = None,
+    recordings: str | Path | None = None,
 ) -> BacktestResult:
     """Run ``cfg`` over every session of ``sessions`` from ``cache`` (see the module notes).
 
@@ -1007,13 +1099,19 @@ def run_backtest(
     - ``bootstrap_resamples``: the bootstrap resample count (default
       ``reporting.bootstrap_resamples``); a frontier sweep passes its own
       count so each configuration's intervals are drawn once.
+    - ``mode="replay"`` with ``recordings``, a directory of live recordings
+      (``{session}.jsonl.gz``): the range's sessions that have a recording
+      run from it (see the module notes); the Data_Cache still supplies the
+      trailing Regime medians and the Holdout_Period.
 
     Raises :class:`BacktestInputError` or :class:`~fse.calendars.CalendarError`
     (exit 2) before any Decision_Time and before any output file. After that,
     any error ends the run with an ``aborted`` Run_Manifest and propagates.
     """
-    if mode != "historical":
-        raise NotImplementedError("replay mode reads a live recording; it is not available yet")
+    if mode not in ("historical", "replay"):
+        raise BacktestInputError(f"mode must be historical or replay, got {mode!r}")
+    if (mode == "replay") != (recordings is not None):
+        raise BacktestInputError("replay mode, and only replay mode, takes a recordings directory")
     if isinstance(workers, bool) or not isinstance(workers, int) or workers < 1:
         raise BacktestInputError(f"workers must be a whole number of at least 1: {workers!r}")
     if calendar_dir is None:
@@ -1035,6 +1133,17 @@ def run_backtest(
             raise BacktestInputError(
                 f"none of the selected sessions is in {sessions.start} to {sessions.end}"
             )
+    files: dict[date, Path] = {}
+    if recordings is not None:
+        folder = Path(recordings).expanduser()
+        if not folder.is_dir():
+            raise BacktestInputError(f"the recordings directory {folder} does not exist")
+        files = replay_files(folder)
+        run_sessions = tuple(d for d in run_sessions if d in files)
+        if not run_sessions:
+            raise BacktestInputError(
+                f"{folder} holds no recording for {sessions.start} to {sessions.end}"
+            )
     calendar = calendars.exchange.sessions
     params = EngineParams.from_sections(cfg)
     instruments = params.instruments
@@ -1045,9 +1154,24 @@ def run_backtest(
 
     view_id = heatmap_view(cfg.data.heatmap_view).view_id()
     symbols = tuple(cfg.data.symbols)
-    checks = check_sessions(
-        cache, calendar, run_sessions, symbols=symbols, view_id=view_id, instruments=instruments
-    )
+    replays: dict[date, ReplaySession] = {}
+    if files:
+        for d in run_sessions:
+            replays[d] = load_replay(
+                files[d],
+                session=d,
+                symbols=symbols,
+                view_id=view_id,
+                instruments=instruments,
+                events=_session_events(calendars.events.events, d),
+            )
+        checks = tuple(
+            SessionCheck(d, (), (), r.missing_snapshots, r.missing_bars) for d, r in replays.items()
+        )
+    else:
+        checks = check_sessions(
+            cache, calendar, run_sessions, symbols=symbols, view_id=view_id, instruments=instruments
+        )
     gaps = tuple(g for c in checks for g in c.gaps)
     if offline:
         writer.echo(
@@ -1060,7 +1184,7 @@ def run_backtest(
     cfg_hash = config_hash(cfg)
     spec = RunSpec(
         run_id=run_id or default_run_id(cfg_hash, sessions, resolved_seed, mode),
-        kind=BACKTEST_KIND,
+        kind=BACKTEST_KIND if mode == "historical" else REPLAY_KIND,
         config_hash=cfg_hash,
         data_range=sessions,
         seed=resolved_seed,
@@ -1101,7 +1225,12 @@ def run_backtest(
         with DecisionLog(writer, log_path) as log:
             rec.output(log_path)
             loop = _Loop(cfg, engine, account, calendar, log, shadow_mode)
-            loaded = _prefetch(cache, [c for c in checks if not c.skip], load_spec, workers)
+            todo = [c for c in checks if not c.skip]
+            loaded = (
+                _replayed([replays[c.session] for c in todo], params.node_params)
+                if replays
+                else _prefetch(cache, todo, load_spec, workers)
+            )
             evaluated: list[date] = []
             try:
                 for check in checks:

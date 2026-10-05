@@ -913,12 +913,12 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
   - Ensure all tests pass, ask the user if questions arise.
   - Operator: choose a config, run `fse experiment holdout --config <chosen>`, then run `fse drafts build --chosen <chosen>`. Review the drafts and run `fse skilldocs check` and `fse scan-secrets`. Record an approval only after the review.
 
-- [ ] 32. Live data feeds, recorder and replay
-  - [ ] 32.1 Add the live ring-buffer MarketView
+- [x] 32. Live data feeds, recorder and replay
+  - [x] 32.1 Add the live ring-buffer MarketView
     - Extend `src/fse/pit/market_view.py` with a view over append-only ring buffers, using `available_at = max(Observation_Time, receipt_time)`
     - _Requirements: 5.1, 5.2, 5.3, 23.9_
 
-  - [ ] 32.2 Implement the map feed
+  - [x] 32.2 Implement the map feed
     - `src/fse/live/map_feed.py`:
       - polling sends two multi-symbol `GET /v1/heatmap` requests per interval
       - stream mode opens two `GET /v1/stream` connections
@@ -926,17 +926,17 @@ The Monte_Carlo_Simulator comes before ablation because the ablation report need
       - after a failed or slow refresh, keep the prior Map_State
     - _Requirements: 23.2, 23.3, 23.4, 23.14_
 
-  - [ ] 32.3 Implement the bar feed, dark-pool feed and levels comparison
+  - [x] 32.3 Implement the bar feed, dark-pool feed and levels comparison
     - `src/fse/live/bar_feed.py`: ProjectX closed 1-minute bars
     - `src/fse/live/darkpool_feed.py`: runs when the Gate is enabled
     - `src/fse/live/levels_compare.py`: compares `GET /v1/gex/levels` every 60 s in Paper and Practice mode. The comparison is logged and used in no decision
     - _Requirements: 4.12, 23.10_
 
-  - [ ] 32.4 Implement the live recorder
+  - [x] 32.4 Implement the live recorder
     - `src/fse/live/recorder.py`: writes `recordings/{session}.jsonl.gz` through the Log_Writer, covering every input kind with its receipt time, never headers or keys
     - _Requirements: 23.8_
 
-  - [ ] 32.5 Implement replay mode
+  - [x] 32.5 Implement replay mode
     - `src/fse/backtest/replay.py`, plus `mode="replay"` in `src/fse/backtest/runner.py`: the recorded receipt times become `available_at`, and replay uses the recorded Decision_Times and guard events
     - _Requirements: 23.9_
 

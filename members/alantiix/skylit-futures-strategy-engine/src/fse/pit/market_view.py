@@ -16,11 +16,24 @@ Snapshots of another Heatmap_View or of a symbol or metric that is not
 configured are left out, so Map_State is always built from the configured view
 (Req 5.1). The Backtester builds one ``HistoricalInputs`` per session, so
 "same session" lookups such as Node_Velocity's ``v0`` need no extra filter.
+
+**Live** (design "Time model", Req 5.1-5.3, 23.9). :class:`LiveInputs` holds
+the same series as append-only :class:`~fse.pit.asof.RingIndex` buffers. The
+live feeds append each input with its receipt time, so it is available at
+``max(Observation_Time, receipt_time)``; ``inputs.view(t)`` is a
+:class:`LiveMarketView` that sees each buffer truncated at ``t``. The view code
+is shared with :class:`HistoricalMarketView`, and a ring answers every query as
+an :class:`~fse.pit.asof.AsOfIndex` of the same records in the same order does,
+so a replay of the recording (``HistoricalInputs`` of ``Received`` records)
+sees what the live view saw. VIX daily values become available at
+``max(Observation_Time, receipt_time)`` too (:func:`vix_daily_received`). The
+Live_Runner starts a new ``LiveInputs`` for each session.
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterable, Iterator, Mapping, Sequence
+from dataclasses import replace
 from typing import Final, cast
 
 from fse.config.schema.data import HeatmapViewConfig
@@ -36,7 +49,14 @@ from fse.engine.types import (
     Unavailable,
     VixState,
 )
-from fse.pit.asof import AsOfIndex, Received, observation_time
+from fse.pit.asof import (
+    DEFAULT_RING_CAPACITY,
+    AsOfIndex,
+    Received,
+    RingIndex,
+    available_at,
+    observation_time,
+)
 from fse.pit.protocols import (
     FUTURES_PRICE_INTERVAL_S,
     MapState,
@@ -50,7 +70,11 @@ __all__ = [
     "VIX_BAR_INTERVAL_S",
     "HistoricalInputs",
     "HistoricalMarketView",
+    "LiveInputs",
+    "LiveMarketView",
     "heatmap_view",
+    "vix_daily_received",
+    "vix_daily_slot",
 ]
 
 MAP_METRICS: Final[tuple[Metric, ...]] = ("gamma", "vanna")
@@ -77,6 +101,55 @@ def _require[T](label: str, item: object, kind: type[T]) -> T:
     if not isinstance(item, kind):
         raise ValueError(f"{label} must be {kind.__name__}, got {type(item).__name__}")
     return item
+
+
+def _map_keys(symbols: Iterable[str], metrics: Iterable[Metric]) -> tuple[SymMetric, ...]:
+    syms = tuple(symbols)
+    mets = tuple(metrics)
+    for s in syms:
+        if not isinstance(s, str) or not s.strip():
+            raise ValueError(f"symbols entries must be non-blank strings, got {s!r}")
+    for m in mets:
+        if m not in METRICS:
+            raise ValueError(f"metrics entries must be one of {sorted(METRICS)}, got {m!r}")
+    for name, values in (("symbols", syms), ("metrics", mets)):
+        if len(set(values)) != len(values):
+            raise ValueError(f"{name} lists an entry more than once: {values!r}")
+    return tuple((s, m) for s in syms for m in mets)
+
+
+def _check_view_id(view_id: object) -> str:
+    if not isinstance(view_id, str) or not view_id:
+        raise ValueError(f"view_id must be a non-blank string, got {view_id!r}")
+    return view_id
+
+
+def _check_vix_daily(today: VixDailyRecord | None, prior: VixDailyRecord | None) -> None:
+    for label, record in (("vix_today", today), ("vix_prior", prior)):
+        if record is not None:
+            _require(label, record, VixDailyRecord)
+    if today is not None and prior is not None and not prior.session < today.session:
+        raise ValueError(
+            f"vix_prior is for {prior.session}, not before vix_today's {today.session}"
+        )
+
+
+def vix_daily_received(record: VixDailyRecord, received_ns: Instant) -> VixDailyRecord:
+    """``record`` with each value's instant moved to ``max(Observation_Time, receipt_time)`` (D8).
+
+    The live view and the replay of a recording both use it, so a VIX daily
+    value received live becomes usable at the same instant in both.
+    """
+    _require("record", record, VixDailyRecord)
+    return replace(
+        record,
+        open_at_ns=None
+        if record.open_at_ns is None
+        else available_at(record.open_at_ns, received_ns),
+        close_at_ns=(
+            None if record.close_at_ns is None else available_at(record.close_at_ns, received_ns)
+        ),
+    )
 
 
 class HistoricalInputs:
@@ -117,21 +190,8 @@ class HistoricalInputs:
         dark_pool: Mapping[str, Iterable[DarkPoolPrint | Received[DarkPoolPrint]]] | None = None,
         events: Iterable[EconomicEvent] = (),
     ) -> None:
-        syms = tuple(symbols)
-        mets = tuple(metrics)
-        for s in syms:
-            if not isinstance(s, str) or not s.strip():
-                raise ValueError(f"symbols entries must be non-blank strings, got {s!r}")
-        for m in mets:
-            if m not in METRICS:
-                raise ValueError(f"metrics entries must be one of {sorted(METRICS)}, got {m!r}")
-        for name, values in (("symbols", syms), ("metrics", mets)):
-            if len(set(values)) != len(values):
-                raise ValueError(f"{name} lists an entry more than once: {values!r}")
-        if not isinstance(view_id, str) or not view_id:
-            raise ValueError(f"view_id must be a non-blank string, got {view_id!r}")
-        self._view_id = view_id
-        self._keys: tuple[SymMetric, ...] = tuple((s, m) for s in syms for m in mets)
+        self._keys: tuple[SymMetric, ...] = _map_keys(symbols, metrics)
+        self._view_id = _check_view_id(view_id)
 
         by_key: dict[SymMetric, list[Snapshot | Received[Snapshot]]] = {k: [] for k in self._keys}
         for i, snap_item in enumerate(snapshots):
@@ -160,17 +220,7 @@ class HistoricalInputs:
                 )
         self._vix_bars: AsOfIndex[Bar] = AsOfIndex.of(vix_items, observation_time)
 
-        for label, record in (("vix_today", vix_today), ("vix_prior", vix_prior)):
-            if record is not None:
-                _require(label, record, VixDailyRecord)
-        if (
-            vix_today is not None
-            and vix_prior is not None
-            and not vix_prior.session < vix_today.session
-        ):
-            raise ValueError(
-                f"vix_prior is for {vix_prior.session}, not before vix_today's {vix_today.session}"
-            )
+        _check_vix_daily(vix_today, vix_prior)
         self._vix_today = vix_today
         self._vix_prior = vix_prior
 
@@ -204,12 +254,12 @@ class HistoricalInputs:
         return HistoricalMarketView(self, t)
 
 
-class HistoricalMarketView:
-    """A :class:`~fse.pit.protocols.MarketView` over :class:`HistoricalInputs` at ``t``."""
+class _IndexedView:
+    """The :class:`~fse.pit.protocols.MarketView` queries over indexed inputs at ``t``."""
 
     __slots__ = ("_in", "_map_state", "_t")
 
-    def __init__(self, inputs: HistoricalInputs, t: Instant) -> None:
+    def __init__(self, inputs: HistoricalInputs | LiveInputs, t: Instant) -> None:
         if not isinstance(t, int) or isinstance(t, bool):
             raise ValueError(f"t must be an integer Instant, got {t!r}")
         self._in = inputs
@@ -285,3 +335,172 @@ class HistoricalMarketView:
 
     def events(self) -> Sequence[EconomicEvent]:
         return self._in._events
+
+
+def vix_daily_slot(
+    current: VixDailyRecord | None,
+    raw: VixDailyRecord | None,
+    new: VixDailyRecord | None,
+    received_ns: Instant,
+) -> tuple[VixDailyRecord | None, VixDailyRecord | None]:
+    """The (available, as received) VIX record of a slot after setting ``new`` at ``received_ns``.
+
+    An unchanged record keeps its earlier receipt time; ``LiveInputs`` and replay share this.
+    """
+    if new is None:
+        return None, None
+    if new == raw and current is not None:
+        return current, raw
+    return vix_daily_received(new, received_ns), new
+
+
+class HistoricalMarketView(_IndexedView):
+    """A :class:`~fse.pit.protocols.MarketView` over :class:`HistoricalInputs` at ``t``."""
+
+    __slots__ = ()
+
+    def __init__(self, inputs: HistoricalInputs, t: Instant) -> None:
+        super().__init__(inputs, t)
+
+
+# ---------------------------------------------------------------- live
+
+
+class LiveInputs:
+    """One live session's inputs in append-only ring buffers (design "Time model").
+
+    The same keys and filters as :class:`HistoricalInputs`: Snapshots of the
+    configured Heatmap_View per configured (symbol, metric), bars per
+    (instrument, interval), 1-minute VIX bars, dark-pool prints per fetched
+    ticker, and the economic events. Every ``add_*`` call takes the receipt
+    time; the input is available at ``max(Observation_Time, receipt_time)``.
+    ``capacity`` bounds each series (:class:`~fse.pit.asof.RingIndex`).
+
+    The Live_Runner appends inputs in receipt order and builds one view per
+    Decision_Time with :meth:`view`. A view sees only inputs available at its
+    ``t``, so inputs appended after it was built stay invisible to it unless
+    they were available by ``t``.
+    """
+
+    __slots__ = (
+        "_bars",
+        "_capacity",
+        "_dark_pool",
+        "_events",
+        "_keys",
+        "_raw_prior",
+        "_raw_today",
+        "_snapshots",
+        "_view_id",
+        "_vix_bars",
+        "_vix_prior",
+        "_vix_today",
+    )
+
+    def __init__(
+        self,
+        *,
+        symbols: Iterable[str],
+        view_id: str,
+        metrics: Iterable[Metric] = MAP_METRICS,
+        events: Iterable[EconomicEvent] = (),
+        capacity: int = DEFAULT_RING_CAPACITY,
+    ) -> None:
+        self._keys: tuple[SymMetric, ...] = _map_keys(symbols, metrics)
+        self._view_id = _check_view_id(view_id)
+        self._capacity = capacity
+        self._snapshots: dict[SymMetric, RingIndex[Snapshot]] = {
+            k: RingIndex(capacity) for k in self._keys
+        }
+        self._bars: dict[tuple[str, int], RingIndex[Bar]] = {}
+        self._vix_bars: RingIndex[Bar] = RingIndex(capacity)
+        self._dark_pool: dict[str, RingIndex[DarkPoolPrint]] = {}
+        evs = [_require(f"events[{i}]", e, EconomicEvent) for i, e in enumerate(events)]
+        self._events: tuple[EconomicEvent, ...] = tuple(
+            sorted(evs, key=lambda e: (e.release_ns, e.event_type))
+        )
+        self._vix_today: VixDailyRecord | None = None
+        self._vix_prior: VixDailyRecord | None = None
+        self._raw_today: VixDailyRecord | None = None
+        self._raw_prior: VixDailyRecord | None = None
+
+    @property
+    def keys(self) -> tuple[SymMetric, ...]:
+        """The Map_State keys in configured order: each symbol, then each metric."""
+        return self._keys
+
+    @property
+    def view_id(self) -> str:
+        return self._view_id
+
+    def add_snapshot(self, snapshot: Snapshot, received_ns: Instant) -> bool:
+        """Append ``snapshot``; ``False`` (nothing kept) for another view or an unconfigured key."""
+        snap = _require("snapshot", snapshot, Snapshot)
+        ring = self._snapshots.get((snap.symbol, snap.metric))
+        if ring is None or snap.view_id != self._view_id:
+            return False
+        ring.append(snap, observation_time(snap), received_ns)
+        return True
+
+    def add_bar(self, bar: Bar, received_ns: Instant) -> None:
+        """Append a futures bar (any interval) to its (instrument, interval) series."""
+        b = _require("bar", bar, Bar)
+        ring = self._bars.get((b.instrument, b.interval_s))
+        if ring is None:
+            ring = self._bars[(b.instrument, b.interval_s)] = RingIndex(self._capacity)
+        ring.append(b, observation_time(b), received_ns)
+
+    def add_vix_bar(self, bar: Bar, received_ns: Instant) -> None:
+        """Append a 1-minute VIX bar; ``ValueError`` for another interval."""
+        b = _require("bar", bar, Bar)
+        if b.interval_s != VIX_BAR_INTERVAL_S:
+            raise ValueError(f"a VIX bar must be a 1-minute bar, not a {b.interval_s}s bar")
+        self._vix_bars.append(b, observation_time(b), received_ns)
+
+    def set_vix_daily(
+        self,
+        today: VixDailyRecord | None,
+        prior: VixDailyRecord | None,
+        received_ns: Instant,
+    ) -> None:
+        """Set the session's and prior session's VIX daily records (:func:`vix_daily_received`).
+
+        A record equal to the one already set keeps its earlier receipt time.
+        """
+        _check_vix_daily(today, prior)
+        self._vix_today, self._raw_today = vix_daily_slot(
+            self._vix_today, self._raw_today, today, received_ns
+        )
+        self._vix_prior, self._raw_prior = vix_daily_slot(
+            self._vix_prior, self._raw_prior, prior, received_ns
+        )
+
+    def add_dark_pool(
+        self, ticker: str, prints: Iterable[DarkPoolPrint], received_ns: Instant
+    ) -> None:
+        """Append one fetch of ``ticker``'s prints; the ticker counts as fetched from now on."""
+        if not isinstance(ticker, str) or not ticker.strip():
+            raise ValueError(f"ticker must be a non-blank string, got {ticker!r}")
+        items = list(prints)
+        for i, item in enumerate(items):
+            p = _require(f"prints[{i}]", item, DarkPoolPrint)
+            if p.ticker != ticker:
+                raise ValueError(f"prints[{i}] is a print for {p.ticker!r}, not {ticker!r}")
+        ring = self._dark_pool.get(ticker)
+        if ring is None:
+            ring = self._dark_pool[ticker] = RingIndex(self._capacity)
+        for p in items:
+            ring.append(p, observation_time(p), received_ns)
+
+    def view(self, t: Instant) -> LiveMarketView:
+        """The MarketView at Decision_Time ``t``."""
+        return LiveMarketView(self, t)
+
+
+class LiveMarketView(_IndexedView):
+    """A :class:`~fse.pit.protocols.MarketView` over :class:`LiveInputs` at ``t``."""
+
+    __slots__ = ()
+
+    def __init__(self, inputs: LiveInputs, t: Instant) -> None:
+        super().__init__(inputs, t)
