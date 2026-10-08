@@ -1,0 +1,51 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bigtrades-indicator"
+version = "0.1.0"
+description = "One alert per aggressive sweep on the ProjectX (TopstepX) futures tape."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
+authors = [{ name = "v01" }]
+keywords = ["futures", "order-flow", "big-trades", "projectx", "topstepx", "signalr"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Operating System :: OS Independent",
+  "Topic :: Office/Business :: Financial :: Investment",
+]
+dependencies = [
+  "httpx>=0.27",
+  "websockets>=13",
+  "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[project.scripts]
+bigtrades = "bigtrades.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/bigtrades"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+ignore = ["SIM105", "SIM117"]
+
+[tool.black]
+line-length = 120
+target-version = ["py311"]
