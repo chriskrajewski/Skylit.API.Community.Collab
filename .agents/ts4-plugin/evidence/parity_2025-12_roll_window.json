@@ -1,0 +1,80 @@
+{
+  "bars": 35761,
+  "first": "2025-12-01",
+  "last": "2026-01-09",
+  "ts4": {
+    "sim_trades": 81,
+    "plugin_trades": 81,
+    "matched": 81,
+    "exact": true,
+    "mismatch_fields": {},
+    "mismatch_examples": [],
+    "sim": {
+      "trades": 81,
+      "win_rate": 0.8272,
+      "net_usd": -740.5,
+      "per_trade_usd": -9.14,
+      "worst_usd": -945.0
+    },
+    "plugin": {
+      "trades": 81,
+      "win_rate": 0.8272,
+      "net_usd": -740.5,
+      "per_trade_usd": -9.14,
+      "worst_usd": -945.0
+    },
+    "elapsed_s": 40.2,
+    "exit_code": 0,
+    "faults": {},
+    "backstops": 0,
+    "hook_latency_warnings": 0,
+    "skips": {
+      "no_bar": 39
+    },
+    "be_trail_inert": {
+      "stop_moved_trades": 0,
+      "stop_moves": 0,
+      "identical_with_be_trail_off": true
+    },
+    "sim_counters": {
+      "no_bar": 18,
+      "session_end_skips": 0
+    }
+  },
+  "ts4_v2": {
+    "sim_trades": 105,
+    "plugin_trades": 105,
+    "matched": 105,
+    "exact": true,
+    "mismatch_fields": {},
+    "mismatch_examples": [],
+    "sim": {
+      "trades": 105,
+      "win_rate": 0.819,
+      "net_usd": -873.0,
+      "per_trade_usd": -8.31,
+      "worst_usd": -895.0
+    },
+    "plugin": {
+      "trades": 105,
+      "win_rate": 0.819,
+      "net_usd": -873.0,
+      "per_trade_usd": -8.31,
+      "worst_usd": -895.0
+    },
+    "elapsed_s": 40.2,
+    "exit_code": 0,
+    "faults": {},
+    "backstops": 0,
+    "hook_latency_warnings": 0,
+    "skips": {
+      "no_bar": 12,
+      "position_open": 3
+    },
+    "sim_counters": {
+      "no_bar": 0,
+      "position_open_skips": 3,
+      "session_end_skips": 0
+    }
+  }
+}
