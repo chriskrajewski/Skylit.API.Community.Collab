@@ -1,0 +1,7 @@
+{"recv_ms": 1791476000000.0, "arguments": ["CON.F.US.EP.Z26", {"symbolId": "F.US.EP", "price": 7830.0, "timestamp": "2026-10-08T14:32:05.1234567+00:00", "type": 1, "volume": 120}]}
+{"recv_ms": 1791476000001.0, "arguments": ["CON.F.US.EP.Z26", {"symbolId": "F.US.EP", "price": 7830.0, "timestamp": "2026-10-08T14:32:05.1234567+00:00", "type": 1, "volume": 86}]}
+{"recv_ms": 1791476000002.0, "arguments": ["CON.F.US.EP.Z26", {"symbolId": "F.US.EP", "price": 7829.75, "timestamp": "2026-10-08T14:32:05.1234567+00:00", "type": 1, "volume": 140}]}
+{"recv_ms": 1791476000003.0, "arguments": ["CON.F.US.EP.Z26", {"symbolId": "F.US.EP", "price": 7829.75, "timestamp": "2026-10-08T14:32:05.1234567+00:00", "type": 1, "volume": 55}]}
+{"recv_ms": 1791476000004.0, "arguments": ["CON.F.US.EP.Z26", {"symbolId": "F.US.EP", "price": 7829.5, "timestamp": "2026-10-08T14:32:05.1234567+00:00", "type": 1, "volume": 60}]}
+{"recv_ms": 1791476000005.0, "arguments": ["CON.F.US.EP.Z26", {"symbolId": "F.US.EP", "price": 7829.5, "timestamp": "2026-10-08T14:32:05.1234567+00:00", "type": 1, "volume": 40}]}
+{"recv_ms": 1791476001000.0, "arguments": ["CON.F.US.EP.Z26", [{"symbolId": "F.US.EP", "price": 7829.75, "timestamp": "2026-10-08T14:32:06.200Z", "type": 0, "volume": 3}, {"symbolId": "F.US.EP", "price": 7829.75, "timestamp": "2026-10-08T14:32:06.200Z", "type": 0, "volume": 2}]]}

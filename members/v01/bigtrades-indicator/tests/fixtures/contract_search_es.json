@@ -1,0 +1,43 @@
+{
+  "contracts": [
+    {
+      "id": "CON.F.US.EP.H27",
+      "name": "ESH7",
+      "description": "E-mini S&P 500: March 2027",
+      "tickSize": 0.25,
+      "tickValue": 12.5,
+      "activeContract": true,
+      "symbolId": "F.US.EP"
+    },
+    {
+      "id": "CON.F.US.EP.Z26",
+      "name": "ESZ6",
+      "description": "E-mini S&P 500: December 2026",
+      "tickSize": 0.25,
+      "tickValue": 12.5,
+      "activeContract": true,
+      "symbolId": "F.US.EP"
+    },
+    {
+      "id": "CON.F.US.MES.Z26",
+      "name": "MESZ6",
+      "description": "Micro E-mini S&P 500: December 2026",
+      "tickSize": 0.25,
+      "tickValue": 1.25,
+      "activeContract": true,
+      "symbolId": "F.US.MES"
+    },
+    {
+      "id": "CON.F.US.EP.U26",
+      "name": "ESU6",
+      "description": "E-mini S&P 500: September 2026",
+      "tickSize": 0.25,
+      "tickValue": 12.5,
+      "activeContract": false,
+      "symbolId": "F.US.EP"
+    }
+  ],
+  "success": true,
+  "errorCode": 0,
+  "errorMessage": null
+}
