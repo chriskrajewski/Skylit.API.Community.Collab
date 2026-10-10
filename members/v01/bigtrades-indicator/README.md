@@ -24,6 +24,10 @@
 > [TopstepX API Access](https://help.topstep.com/en/articles/11187768-topstepx-api-access)
 > and the [Terms of Use](https://www.topstep.com/terms-of-use).
 
+There is a referral code, if you decide to also buy an account with Topstep to go with the ProjectX API.
+TS-NNZ8GY3DB3DH2
+
+
 **One alert per aggressive sweep on the ProjectX (TopstepX) futures tape.**
 
 Built first as a signal source for trading bots: each finished sweep is handed
