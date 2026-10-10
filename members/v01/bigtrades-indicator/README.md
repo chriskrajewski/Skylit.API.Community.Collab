@@ -148,8 +148,10 @@ ES big SELL 206 @ 7830.00 | avg fill 7830.00 | 2 prints | 14:32:05.123 UTC | fir
 
 Official docs: <https://gateway.docs.projectx.com/docs/intro>
 
+> **⚠️ You need an active account with Topstep to link the API via ProjectX. Some accounts will linger on Topstep even after failure, which keeps the API connected.**
 > **Tip: use code `topstep` for 50% off the ProjectX API subscription.** The code
-> was valid when this was published and the offer may change. If you use code `TS-NNZ8GY3DB3DH2` for account purchases it will give you a discount. However, there is no kickback to me if you choose to do so other than 15% off on my next purchase (which isnt doing anything for me since I dont need it). Only use the code for your own discount - and if you want to do something for me just pay it forward to the community instead.
+> was valid when this was published and the offer may change. 
+> If you use code `TS-NNZ8GY3DB3DH2` for account purchases it will give first-time customers 15% off their first Trading Combine purchase. However, there is no kickback to me if you choose to do so other than 15% off on my next purchase (which isn't doing anything for me since I don't need it). Only use the code for your own discount - and if you want to do something for me just pay it forward to the community instead.
 
 1. **Get access.** API access is a paid ProjectX subscription. Once it is active,
    sign in to TopstepX and open **Settings → API**
