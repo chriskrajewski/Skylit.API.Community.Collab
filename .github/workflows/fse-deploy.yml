@@ -10,8 +10,14 @@ name: fse-deploy
 on:
   push:
     branches: [main]
+    # Infra-only and docs-only commits do not deploy: every runner restart risks the
+    # rollback hazard (README). fse-infra handles infra/; workflow_dispatch forces a deploy.
+    # Order matters: a ! pattern only excludes paths matched by an earlier pattern.
     paths:
       - "members/alantiix/skylit-futures-strategy-engine/**"
+      - "!members/alantiix/skylit-futures-strategy-engine/infra/**"
+      - "!members/alantiix/skylit-futures-strategy-engine/README.md"
+      - "!members/alantiix/skylit-futures-strategy-engine/docs/**"
       - ".github/workflows/fse-deploy.yml"
   workflow_dispatch:
 
