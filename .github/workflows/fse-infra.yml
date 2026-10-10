@@ -1,0 +1,223 @@
+# fse infra: offline checks on every change, a plan behind the production environment,
+# and an apply only when started by hand with apply = true.
+#
+# Needs (see the "Run on AWS" section of the fse README):
+#   secret   GIT_CRYPT_KEY            base64 of `git-crypt export-key -`
+#   variable AWS_PLAN_PUSH_ROLE_ARN   bootstrap output plan_push_role_arn
+#   variable AWS_APPLY_ROLE_ARN       bootstrap output apply_role_arn (create_apply_role = true)
+#   variable TF_STATE_BUCKET          bootstrap output state_bucket_name
+#   variable FSE_ALERT_EMAIL          address subscribed to the fse-alerts topic
+#   environment production            with a required reviewer (gates plan and apply)
+name: fse-infra
+
+on:
+  pull_request:
+    paths:
+      - "members/alantiix/skylit-futures-strategy-engine/infra/**"
+      - ".github/workflows/fse-infra.yml"
+  push:
+    branches: [main]
+    paths:
+      - "members/alantiix/skylit-futures-strategy-engine/infra/**"
+      - ".github/workflows/fse-infra.yml"
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Apply the plan (needs AWS_APPLY_ROLE_ARN)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Plans and applies share one state lock; queue them, never cancel one mid-run.
+concurrency:
+  group: fse-infra
+  cancel-in-progress: false
+
+env:
+  INFRA_DIR: members/alantiix/skylit-futures-strategy-engine/infra
+  AWS_REGION: us-east-1
+  TERRAFORM_VERSION: 1.15.8
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    env:
+      # No AWS access in this job: tests use mock providers only.
+      AWS_CONFIG_FILE: /dev/null
+      AWS_SHARED_CREDENTIALS_FILE: /dev/null
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Unlock git-crypt
+        env:
+          GIT_CRYPT_KEY: ${{ secrets.GIT_CRYPT_KEY }}
+        run: |
+          if [ -z "$GIT_CRYPT_KEY" ]; then
+            echo "::error::secret GIT_CRYPT_KEY is not set (base64 of git-crypt export-key -)"
+            exit 1
+          fi
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq git-crypt
+          umask 077
+          key="$RUNNER_TEMP/gc.key"
+          trap 'rm -f "$key"' EXIT
+          printf '%s' "$GIT_CRYPT_KEY" | base64 -d > "$key"
+          git-crypt unlock "$key"
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: bootstrap fmt, validate, test
+        working-directory: ${{ env.INFRA_DIR }}/bootstrap
+        run: |
+          terraform fmt -check -recursive
+          terraform init -backend=false -input=false
+          terraform validate
+          terraform test
+
+      - name: main stack fmt, validate, test
+        working-directory: ${{ env.INFRA_DIR }}
+        run: |
+          terraform fmt -check -recursive
+          terraform init -backend=false -input=false
+          terraform validate
+          terraform test
+
+  plan:
+    needs: check
+    # Fork PRs get no secrets or OIDC token; skip them instead of failing.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    # The OIDC subject becomes environment:production, which the plan-push role trusts.
+    # A reviewer approves before AWS credentials are issued.
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TF_VAR_alert_email: ${{ vars.FSE_ALERT_EMAIL }}
+      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Unlock git-crypt
+        env:
+          GIT_CRYPT_KEY: ${{ secrets.GIT_CRYPT_KEY }}
+        run: |
+          if [ -z "$GIT_CRYPT_KEY" ]; then
+            echo "::error::secret GIT_CRYPT_KEY is not set (base64 of git-crypt export-key -)"
+            exit 1
+          fi
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq git-crypt
+          umask 077
+          key="$RUNNER_TEMP/gc.key"
+          trap 'rm -f "$key"' EXIT
+          printf '%s' "$GIT_CRYPT_KEY" | base64 -d > "$key"
+          git-crypt unlock "$key"
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_PLAN_PUSH_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Plan
+        working-directory: ${{ env.INFRA_DIR }}
+        run: |
+          if [ -z "$TF_STATE_BUCKET" ] || [ -z "$TF_VAR_alert_email" ]; then
+            echo "::error::set the TF_STATE_BUCKET and FSE_ALERT_EMAIL repository variables"
+            exit 1
+          fi
+          terraform init -input=false -backend-config="bucket=$TF_STATE_BUCKET"
+          terraform plan -input=false -lock-timeout=5m -no-color -out=tfplan
+
+      # Addresses and actions only: no attribute values in the job summary.
+      - name: Plan summary
+        working-directory: ${{ env.INFRA_DIR }}
+        run: |
+          {
+            echo "### fse infra plan"
+            echo
+            echo '```'
+            terraform show -json tfplan | jq -r '
+              [.resource_changes[]? | select(.change.actions != ["no-op"])
+               | "\(.change.actions | join(",")) \(.address)"]
+              | if length == 0 then "No changes." else .[] end'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  apply:
+    needs: plan
+    if: github.event_name == 'workflow_dispatch' && inputs.apply
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TF_VAR_alert_email: ${{ vars.FSE_ALERT_EMAIL }}
+      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+      AWS_APPLY_ROLE_ARN: ${{ vars.AWS_APPLY_ROLE_ARN }}
+    steps:
+      - name: Check the apply role
+        run: |
+          if [ -z "$AWS_APPLY_ROLE_ARN" ]; then
+            echo "::error::AWS_APPLY_ROLE_ARN is not set. Apply the bootstrap with create_apply_role = true and set the variable, or apply from your machine."
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Unlock git-crypt
+        env:
+          GIT_CRYPT_KEY: ${{ secrets.GIT_CRYPT_KEY }}
+        run: |
+          if [ -z "$GIT_CRYPT_KEY" ]; then
+            echo "::error::secret GIT_CRYPT_KEY is not set (base64 of git-crypt export-key -)"
+            exit 1
+          fi
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq git-crypt
+          umask 077
+          key="$RUNNER_TEMP/gc.key"
+          trap 'rm -f "$key"' EXIT
+          printf '%s' "$GIT_CRYPT_KEY" | base64 -d > "$key"
+          git-crypt unlock "$key"
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ env.AWS_APPLY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      # Re-plan here with the apply role, then apply exactly that plan.
+      - name: Plan and apply
+        working-directory: ${{ env.INFRA_DIR }}
+        run: |
+          terraform init -input=false -backend-config="bucket=$TF_STATE_BUCKET"
+          terraform plan -input=false -lock-timeout=5m -no-color -out=tfplan
+          terraform apply -input=false -lock-timeout=5m tfplan
