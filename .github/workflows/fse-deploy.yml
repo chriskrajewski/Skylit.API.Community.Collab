@@ -1,0 +1,224 @@
+# fse: test, build the arm64 image, push it to ECR and deploy it to the runner and batch.
+#
+# Needs (see the "Run on AWS" section of the fse README):
+#   secret   GIT_CRYPT_KEY            base64 of `git-crypt export-key -`
+#   variable AWS_PLAN_PUSH_ROLE_ARN   bootstrap output plan_push_role_arn
+#   variable AWS_DEPLOY_ROLE_ARN      bootstrap output deploy_role_arn
+#   environment production            with a required reviewer (gates the deploy job)
+name: fse-deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "members/alantiix/skylit-futures-strategy-engine/**"
+      - ".github/workflows/fse-deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy at a time; a running deploy is never cancelled half way.
+concurrency:
+  group: fse-deploy
+  cancel-in-progress: false
+
+env:
+  PROJECT_DIR: members/alantiix/skylit-futures-strategy-engine
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: fse
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Unlock git-crypt
+        env:
+          GIT_CRYPT_KEY: ${{ secrets.GIT_CRYPT_KEY }}
+        run: |
+          if [ -z "$GIT_CRYPT_KEY" ]; then
+            echo "::error::secret GIT_CRYPT_KEY is not set (base64 of git-crypt export-key -)"
+            exit 1
+          fi
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq git-crypt
+          umask 077
+          key="$RUNNER_TEMP/gc.key"
+          trap 'rm -f "$key"' EXIT
+          printf '%s' "$GIT_CRYPT_KEY" | base64 -d > "$key"
+          git-crypt unlock "$key"
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      - name: Install
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          python -m pip install --require-hashes -r requirements.lock
+          python -m pip install --no-deps -e .
+
+      # The image's Python code: the engine, the tests and the plugins it ships.
+      # (`ruff check .` also lints research scripts the image does not carry.)
+      - name: Lint
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: ruff check src tests research/matrix research/range research/edge_study
+
+      - name: Test
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: python -m pytest -q
+
+  build:
+    needs: test
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      image: ${{ steps.ref.outputs.image }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Unlock git-crypt
+        env:
+          GIT_CRYPT_KEY: ${{ secrets.GIT_CRYPT_KEY }}
+        run: |
+          if [ -z "$GIT_CRYPT_KEY" ]; then
+            echo "::error::secret GIT_CRYPT_KEY is not set (base64 of git-crypt export-key -)"
+            exit 1
+          fi
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq git-crypt
+          umask 077
+          key="$RUNNER_TEMP/gc.key"
+          trap 'rm -f "$key"' EXIT
+          printf '%s' "$GIT_CRYPT_KEY" | base64 -d > "$key"
+          git-crypt unlock "$key"
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_PLAN_PUSH_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
+
+      # Tags are immutable: a rerun of this job reuses the image pushed for the same commit.
+      - id: ref
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          TAG: ${{ github.sha }}
+        run: |
+          echo "image=$REGISTRY/$ECR_REPOSITORY:$TAG" >> "$GITHUB_OUTPUT"
+          if aws ecr describe-images --repository-name "$ECR_REPOSITORY" \
+            --image-ids "imageTag=$TAG" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "image $TAG already in ECR; skipping the build"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.ref.outputs.exists != 'true'
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - if: steps.ref.outputs.exists != 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ env.PROJECT_DIR }}
+          platforms: linux/arm64
+          push: true
+          provenance: false
+          tags: ${{ steps.ref.outputs.image }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # The runner host reads this tag on every (re)start of fse-runner.service.
+      - name: Set /fse/image_tag
+        env:
+          TAG: ${{ github.sha }}
+        run: |
+          aws ssm put-parameter --name /fse/image_tag --type String --overwrite \
+            --value "$TAG" > /dev/null
+          echo "/fse/image_tag = $TAG"
+
+      # Terraform ignores container_definitions; each deploy registers a new revision.
+      - name: Register a new fse-batch revision
+        env:
+          IMAGE: ${{ needs.build.outputs.image }}
+        run: |
+          td="$RUNNER_TEMP/td.json"
+          aws ecs describe-task-definition --task-definition fse-batch \
+            --query taskDefinition --output json > "$td"
+          jq -e '.containerDefinitions[] | select(.name == "fse")' "$td" > /dev/null || {
+            echo "::error::fse-batch has no container named fse"
+            exit 1
+          }
+          jq --arg img "$IMAGE" '
+            (.containerDefinitions[] | select(.name == "fse") | .image) = $img
+            | del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
+                  .compatibilities, .registeredAt, .registeredBy, .deregisteredAt)
+          ' "$td" > "$RUNNER_TEMP/td-new.json"
+          arn=$(aws ecs register-task-definition \
+            --cli-input-json "file://$RUNNER_TEMP/td-new.json" \
+            --query taskDefinition.taskDefinitionArn --output text)
+          echo "registered $arn"
+
+      - name: Restart fse-runner
+        run: |
+          ids=$(aws ec2 describe-instances \
+            --filters Name=tag:Role,Values=fse-runner Name=instance-state-name,Values=running \
+            --query 'Reservations[].Instances[].InstanceId' --output text)
+          read -r -a found <<< "$ids"
+          if [ "${#found[@]}" -ne 1 ]; then
+            echo "::error::expected one running instance tagged Role=fse-runner, found ${#found[@]}: $ids"
+            exit 1
+          fi
+          instance="${found[0]}"
+          cmd=$(aws ssm send-command --instance-ids "$instance" \
+            --document-name AWS-RunShellScript \
+            --comment "fse deploy ${GITHUB_SHA}" \
+            --parameters 'commands=["systemctl restart fse-runner","systemctl is-active fse-runner"]' \
+            --query Command.CommandId --output text)
+          echo "command $cmd on $instance"
+          for _ in $(seq 1 60); do
+            sleep 5
+            status=$(aws ssm get-command-invocation --command-id "$cmd" \
+              --instance-id "$instance" --query Status --output text 2> /dev/null || echo Pending)
+            case "$status" in
+              Success)
+                echo "fse-runner restarted"
+                exit 0
+                ;;
+              Pending | InProgress | Delayed) ;;
+              *)
+                aws ssm get-command-invocation --command-id "$cmd" --instance-id "$instance" \
+                  --query '[StandardOutputContent, StandardErrorContent]' --output text || true
+                echo "::error::restart on $instance ended with status $status"
+                exit 1
+                ;;
+            esac
+          done
+          echo "::error::restart on $instance did not finish within 5 minutes"
+          exit 1
