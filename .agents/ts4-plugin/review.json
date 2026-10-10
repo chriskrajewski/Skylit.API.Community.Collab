@@ -1,8 +1,0 @@
-{
-  "verdict": "APPROVED",
-  "findings": [
-    "Non-blocking: research/edge_study/tests/__init__.py and research/matrix_heatseeker/tests/__init__.py still show as M in `git diff --name-status` (git-crypt artifact, 22 -> 0 bytes) although verification.md U.0 says they no longer do; leave them unstaged when committing and correct that line.",
-    "Non-blocking (carried, documented): at slip 1 the host prices brackets from the unslipped open, so paper P&L runs about $1.76 (ts4) / $1.82 (ts4_v2) per trade below the research until EnterMarket.levels_from: \"fill\" lands in core."
-  ],
-  "reviewDoc": "/Users/chriskrajewski/Documents/GitHub/skylit.api.community.collab/.worktrees/ts4-plugin/.agents/ts4-plugin/review-latest.md"
-}
