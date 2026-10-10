@@ -1,0 +1,8 @@
+ts4 IS 880 pct_risk>600: 0.581 worst $-956.00 max risk $956.00 net $18844.50 WR 0.852
+ts4 OOS 725 pct_risk>600: 0.581 worst $-956.00 max risk $956.00 net $8747.00 WR 0.841
+ts4_v2 IS 959 pct_risk>600: 0.595 worst $-895.00 max risk $895.00 net $32710.00 WR 0.873
+ts4_v2 OOS 759 pct_risk>600: 0.593 worst $-895.00 max risk $895.00 net $22729.00 WR 0.862
+ts4_real IS 880 pct_risk>600: 0.578 worst $-971.84 max risk $956.00 net $3782.76 WR 0.848
+ts4_real OOS 725 pct_risk>600: 0.574 worst $-971.84 max risk $956.00 net $-6402.48 WR 0.832
+ts4_v2_real IS 959 pct_risk>600: 0.589 worst $-904.90 max risk $895.00 net $18975.44 WR 0.864
+ts4_v2_real OOS 759 pct_risk>600: 0.590 worst $-904.90 max risk $895.00 net $12985.42 WR 0.856
