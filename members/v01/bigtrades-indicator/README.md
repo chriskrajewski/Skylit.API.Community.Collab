@@ -149,7 +149,7 @@ ES big SELL 206 @ 7830.00 | avg fill 7830.00 | 2 prints | 14:32:05.123 UTC | fir
 Official docs: <https://gateway.docs.projectx.com/docs/intro>
 
 > **Tip: use code `topstep` for 50% off the ProjectX API subscription.** The code
-> was valid when this was published and the offer may change. Use code `TS-NNZ8GY3DB3DH2` for account purchases if you are also buying an account to trade. 
+> was valid when this was published and the offer may change. If you use code `TS-NNZ8GY3DB3DH2` for account purchases it will give you a discount. However, there is no kickback to me if you choose to do so other than 15% off on my next purchase (which isnt doing anything for me since I dont need it). Only use the code for your own discount - and if you want to do something for me just pay it forward to the community instead.
 
 1. **Get access.** API access is a paid ProjectX subscription. Once it is active,
    sign in to TopstepX and open **Settings → API**
