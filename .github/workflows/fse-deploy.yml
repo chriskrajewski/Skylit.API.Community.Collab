@@ -73,7 +73,7 @@ jobs:
       # (`ruff check .` also lints research scripts the image does not carry.)
       - name: Lint
         working-directory: ${{ env.PROJECT_DIR }}
-        run: ruff check src tests research/matrix research/range research/edge_study
+        run: ruff check src tests research/matrix research/range research/edge_study research/ts4
 
       - name: Test
         working-directory: ${{ env.PROJECT_DIR }}
