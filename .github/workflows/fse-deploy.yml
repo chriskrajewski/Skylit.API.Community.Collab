@@ -164,21 +164,26 @@ jobs:
           echo "/fse/image_tag = $TAG"
 
       # Terraform ignores container_definitions; each deploy registers a new revision.
+      # The revision keeps Terraform's tags: track_latest makes Terraform read the
+      # newest revision, so an untagged one would show as drift on every plan.
       - name: Register a new fse-batch revision
         env:
           IMAGE: ${{ needs.build.outputs.image }}
         run: |
           td="$RUNNER_TEMP/td.json"
           aws ecs describe-task-definition --task-definition fse-batch \
-            --query taskDefinition --output json > "$td"
-          jq -e '.containerDefinitions[] | select(.name == "fse")' "$td" > /dev/null || {
+            --include TAGS --output json > "$td"
+          jq -e '.taskDefinition.containerDefinitions[] | select(.name == "fse")' "$td" > /dev/null || {
             echo "::error::fse-batch has no container named fse"
             exit 1
           }
           jq --arg img "$IMAGE" '
-            (.containerDefinitions[] | select(.name == "fse") | .image) = $img
+            (.tags // []) as $tags
+            | .taskDefinition
+            | (.containerDefinitions[] | select(.name == "fse") | .image) = $img
             | del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
                   .compatibilities, .registeredAt, .registeredBy, .deregisteredAt)
+            | if ($tags | length) > 0 then .tags = $tags else . end
           ' "$td" > "$RUNNER_TEMP/td-new.json"
           arn=$(aws ecs register-task-definition \
             --cli-input-json "file://$RUNNER_TEMP/td-new.json" \
