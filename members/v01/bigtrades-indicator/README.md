@@ -14,6 +14,16 @@
                                         one sweep, one alert  ·  by v01
 ```
 
+> **⚠️ Caution: do not place Topstep trades from a VPS or cloud server.**
+> Topstep requires all trading activity to come from your own personal device.
+> VPS, VPN and remote-server trading on trading accounts is prohibited and can get
+> an account suspended or removed. Connecting an account from a server without
+> trading is fine, and this tool only reads market data, so running it on a
+> server is fine. If you wire it into a bot that places orders, run that
+> bot at home. See Topstep's rules:
+> [TopstepX API Access](https://help.topstep.com/en/articles/11187768-topstepx-api-access)
+> and the [Terms of Use](https://www.topstep.com/terms-of-use).
+
 **One alert per aggressive sweep on the ProjectX (TopstepX) futures tape.**
 
 Built first as a signal source for trading bots: each finished sweep is handed
