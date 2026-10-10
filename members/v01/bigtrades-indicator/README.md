@@ -25,8 +25,10 @@
 > and the [Terms of Use](https://www.topstep.com/terms-of-use).
 >
 > There is a referral code, if you decide to also buy an account with Topstep to go with the ProjectX API.
-> TS-NNZ8GY3DB3DH2
 
+```
+TS-NNZ8GY3DB3DH2
+```
 
 **One alert per aggressive sweep on the ProjectX (TopstepX) futures tape.**
 
