@@ -23,6 +23,7 @@
 
 | Member | Projects |
 | --- | --- |
+| [akbryan2024](akbryan2024/README.md) | [grok-nq-skylit-context](akbryan2024/grok-nq-skylit-context/README.md) |
 | [alantiix](alantiix/README.md) | [skylit-academy-playbook-skill](alantiix/skylit-academy-playbook-skill/README.md) · [skylit-knowledgebase](alantiix/skylit-knowledgebase/README.md) |
 | [Anubis](Anubis/SirFartalot-Backtest-Study.md) | [SirFartalot-Backtest-Study](Anubis/SirFartalot-Backtest-Study.md) · [Vex_Stairup-down](Anubis/Vex_Stairup-down/vex_stair_grok.py) |
 | [dashingbixby](dashingbixby/README.md) | [recorder](dashingbixby/recorder/README.md) · [argon-knowledgebase](dashingbixby/argon-knowledgebase/README.md) |
