@@ -1,4 +1,5 @@
 import json
+import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -22,9 +23,13 @@ class Boundary:
     second: int # e.g. 0
     tzinfo: ZoneInfo # e.g. ZoneInfo("America/New_York")
 
-# set these values
-api_key = 'abc123' # skylit API key
-start_boundary = Boundary(
+### CHANGE THESE VALUES WHEN YOU RUN YOUR SCRIPT
+
+# skylit API key
+api_key = 'asdf'
+
+# the date to start pulling data from skylit, this value is currently Oct 20, 2025 9:30 AM EDT/EST
+absolute_start_boundary = Boundary(
     year=2025,
     month=10,
     day=20,
@@ -33,7 +38,8 @@ start_boundary = Boundary(
     second=0,
     tzinfo=ZoneInfo("America/New_York")
 )
-end_boundary = Boundary(
+# the date to end pulling data from skylit, this value is currently Oct 18, 2026 4:00 PM EDT/EST
+absolute_end_boundary = Boundary(
     year=2026,
     month=10,
     day=18,
@@ -45,8 +51,15 @@ end_boundary = Boundary(
 
 def create_time_windows(input_start_boundary: Boundary, input_end_boundary: Boundary):
     # Setup time zone and start/end boundaries
-    tz = ZoneInfo("America/New_York")
-    start_boundary = datetime(input_start_boundary.year, input_start_boundary.month, input_start_boundary.day, input_start_boundary['hour'], input_start_boundary['minute'], input_start_boundary['second'], tzinfo=tz)
+    start_boundary = datetime(
+        year=input_start_boundary.year,
+        month=input_start_boundary.month,
+        day=input_start_boundary.day,
+        hour=input_start_boundary.hour,
+        minute=input_start_boundary.minute,
+        second=input_start_boundary.second,
+        tzinfo=input_start_boundary.tzinfo
+    )
     end_boundary = datetime(
         year=input_end_boundary.year,
         month=input_end_boundary.month,
@@ -108,6 +121,16 @@ def fetch_data_from_skylit(tickers: list[str], time_window: Window):
         response.raise_for_status()
 
         data = response.json()
+
+        # Create file path, replacing commas and colons with a dash
+        fp = f"skylit-data/{symbols}_{time_window.start}_{time_window.end}.json".replace(",","-").replace(":","-")
+
+        # Extract the directory path and create it if it doesn't exist
+        os.makedirs(os.path.dirname(fp), exist_ok=True)
+
+        with open(fp, "w+", encoding="utf-8") as f:
+            json.dump(data, f, indent=4)
+
         return data
 
     except HTTPError as http_err:
@@ -119,8 +142,8 @@ def fetch_data_from_skylit(tickers: list[str], time_window: Window):
 
     return None
 
-def fetch_and_download_data():
-    windows = create_time_windows()
+def fetch_and_download_data(input_start_boundary: Boundary, input_end_boundary: Boundary):
+    windows = create_time_windows(input_start_boundary, input_end_boundary)
     # find tickers
     with open("tickers.json", "r") as file:
         all_ticker_lists = json.load(file)
@@ -133,6 +156,6 @@ def fetch_and_download_data():
     print('done')
 
 if __name__ == '__main__':
-    create_time_windows(start_boundary, end_boundary)
-    # fetch_and_download_data()
+    # create_time_windows(absolute_start_boundary, absolute_end_boundary)
+    fetch_and_download_data(absolute_start_boundary, absolute_end_boundary)
 
