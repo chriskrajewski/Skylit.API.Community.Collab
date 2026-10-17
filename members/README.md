@@ -25,7 +25,7 @@
 | --- | --- |
 | [alantiix](alantiix/README.md) | [skylit-academy-playbook-skill](alantiix/skylit-academy-playbook-skill/README.md) · [skylit-knowledgebase](alantiix/skylit-knowledgebase/README.md) |
 | [Anubis](Anubis/SirFartalot-Backtest-Study.md) | [SirFartalot-Backtest-Study](Anubis/SirFartalot-Backtest-Study.md) · [Vex_Stairup-down](Anubis/Vex_Stairup-down/vex_stair_grok.py) |
-| [dashingbixby](dashingbixby/README.md) | [recorder](dashingbixby/recorder/README.md) |
+| [dashingbixby](dashingbixby/README.md) | [recorder](dashingbixby/recorder/README.md) · [argon-knowledgebase](dashingbixby/argon-knowledgebase/README.md) |
 | [raked](raked/README.md) | [mnq-gamma-node](raked/mnq-gamma-node/README.md) |
 | [v01](v01/README.md) | [bigtrades-indicator](v01/bigtrades-indicator/README.md) |
 
