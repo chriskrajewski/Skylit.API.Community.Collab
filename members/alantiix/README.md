@@ -19,3 +19,4 @@
 | --- | --- | --- |
 | [skylit-academy-playbook-skill](skylit-academy-playbook-skill/README.md) | `agent` | Sanitized Agent Skill that grades setups and proposes ES/NQ/GC/SL plans using the Heatseeker methodology |
 | [skylit-knowledgebase](skylit-knowledgebase/README.md) | `agent` | Documentation and stage transcripts in Markdown, for training agents on the Skylit methodology |
+| [fse](fse/README.md) | `agent` | Futures Backtesting and Agent runner supporting multiple plugins and strategies  |
