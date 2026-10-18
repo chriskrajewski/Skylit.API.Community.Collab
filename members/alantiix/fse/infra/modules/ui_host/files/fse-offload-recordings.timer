@@ -1,0 +1,12 @@
+# Every hour (and 10 minutes after boot), so /data keeps at most today plus the
+# last 2 closed days. Installed by the fse-ui-host-bundle SSM document.
+[Unit]
+Description=fse recordings offload every hour
+[Timer]
+OnBootSec=10min
+OnCalendar=hourly
+Persistent=true
+RandomizedDelaySec=120
+Unit=fse-offload-recordings.service
+[Install]
+WantedBy=timers.target

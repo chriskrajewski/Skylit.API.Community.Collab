@@ -1,0 +1,42 @@
+:root{
+/* brand — ice */
+--color-ice-soft:#b9d6fc;--color-ice:#90bff9;--color-ice-deep:#5b9df0;
+--color-ice-wash:rgba(144,191,249,.10);--color-ice-wash-2:rgba(144,191,249,.18);
+/* market / semantic */
+--color-bull:#34d399;--color-bear:#f87171;--color-warning:#fbbf24;--color-info:#90bff9;
+--color-bull-wash:rgba(52,211,153,.12);--color-bear-wash:rgba(248,113,113,.12);--color-warning-wash:rgba(251,191,36,.12);
+--ds-validation-error:var(--color-bear);--ds-validation-warning:var(--color-warning);--ds-validation-info:var(--color-info);
+/* alarm — stronger than bear: halts, kill switches, live-money modes. Solid fills, never just text. */
+--color-alarm:#ef4444;--color-alarm-strong:#dc2626;--color-alarm-wash:rgba(239,68,68,.16);--on-alarm:#ffffff;
+/* neutrals */
+--color-white:#ffffff;--color-mist:#e8e8e8;--color-fog:#9ca3af;--color-graphite-2:#151515;--color-ink:#0a0a0a;--color-black:#000000;
+/* chart candles */
+--color-candle-up-body:#5e7ca2;--color-candle-up-wick:#7aa2d9;--color-candle-up-border:#90bff9;
+--color-candle-down-body:#989898;--color-candle-down-wick:#ffffff;--color-candle-down-border:#ffffff;
+/* ink ramp (surfaces) — built between Ink and Graphite 2 */
+--ink-0:#0a0a0a;--ink-1:#111111;--ink-2:#151515;--ink-3:#1b1b1b;--ink-4:#232323;
+--line-1:#1f1f1f;--line-2:#2a2a2a;--line-3:#3a3a3a;
+--fg-1:#e8e8e8;--fg-2:#9ca3af;--fg-3:#6b7280;--fg-4:#4b5058;
+/* legacy accent names → ice (kept so existing references resolve) */
+--signal-300:var(--color-ice-soft);--signal-400:var(--color-ice-soft);--signal-500:var(--color-ice);--signal-600:var(--color-ice-deep);--signal-700:#2f5f9e;
+--signal-wash:var(--color-ice-wash);--signal-wash-2:var(--color-ice-wash-2);--on-signal:#0a0a0a;
+--alarm-400:var(--color-alarm);--alarm-500:var(--color-alarm);--alarm-wash:var(--color-alarm-wash);
+/* semantic aliases */
+--background:var(--color-ink);--foreground:var(--color-mist);--muted-fg:var(--color-fog);
+--surface-page:var(--ink-0);--surface-panel:var(--ink-1);--surface-raised:var(--ink-2);--surface-hover:var(--ink-3);--surface-active:var(--ink-4);--surface-input:var(--ink-0);--surface-overlay:var(--ink-2);
+--border-subtle:var(--line-1);--border-default:var(--line-2);--border-strong:var(--line-3);--border-focus:var(--color-ice);
+--text-primary:var(--fg-1);--text-secondary:var(--fg-2);--text-tertiary:var(--fg-3);--text-disabled:var(--fg-4);--text-accent:var(--color-ice);--text-danger:var(--color-bear);--text-warning:var(--color-warning);
+--accent:var(--color-ice);--accent-hover:var(--color-ice-soft);--accent-press:var(--color-ice-deep);--accent-wash:var(--color-ice-wash);--on-accent:#0a0a0a;
+--danger:var(--color-alarm);--danger-strong:var(--color-alarm-strong);--danger-wash:var(--color-alarm-wash);--on-danger:var(--on-alarm);--warning:var(--color-warning);--warning-wash:var(--color-warning-wash);
+/* market */
+--pos:var(--color-bull);--neg:var(--color-bear);--flat:var(--fg-3);
+--level-king:var(--color-ice);--level-ceiling:var(--color-bear);--level-floor:var(--color-bull);--level-wall:var(--fg-1);--level-gatekeeper:var(--fg-2);--level-air:var(--fg-4);--level-spot:var(--fg-1);
+}
+[data-theme="light"]{
+--ink-0:#ffffff;--ink-1:#fafafa;--ink-2:#f3f3f3;--ink-3:#ececec;--ink-4:#e2e2e2;
+--line-1:#e6e6e6;--line-2:#d6d6d6;--line-3:#b9b9b9;
+--fg-1:#0a0a0a;--fg-2:#4b5563;--fg-3:#6b7280;--fg-4:#a3a7ae;
+--color-ice:#2f74d0;--color-ice-soft:#5b9df0;--color-ice-deep:#1f5aa8;--color-ice-wash:rgba(47,116,208,.08);--color-ice-wash-2:rgba(47,116,208,.16);
+--color-bull:#059669;--color-bear:#dc2626;--color-warning:#b45309;--color-alarm:#c81e1e;--color-alarm-strong:#a51515;--color-alarm-wash:rgba(200,30,30,.10);
+--on-accent:#ffffff;--on-signal:#ffffff;--signal-700:#1f5aa8;
+}

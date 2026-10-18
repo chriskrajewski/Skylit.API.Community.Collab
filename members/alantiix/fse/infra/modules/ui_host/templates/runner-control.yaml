@@ -1,0 +1,35 @@
+schemaVersion: "2.2"
+description: "fse console: start, stop, restart or report fse-runner.service. No other command runs."
+parameters:
+  action:
+    type: String
+    description: "start, stop, restart or status"
+    allowedValues:
+      - start
+      - stop
+      - restart
+      - status
+mainSteps:
+  - action: aws:runShellScript
+    name: runnerControl
+    inputs:
+      timeoutSeconds: "60"
+      runCommand:
+        - |
+          set -eu
+          # Host files live outside /data: fse-mount-data.sh chowns /data to the
+          # container uid at boot, which would let the console forge the marker.
+          case '{{ action }}' in
+            start | restart)
+              rm -f /var/lib/fse-host/runner-held
+              systemctl reset-failed fse-runner.service || true
+              ;;
+            stop)
+              install -d -m 0755 -o root -g root /var/lib/fse-host && touch /var/lib/fse-host/runner-held
+              ;;
+          esac
+          case '{{ action }}' in
+            status) ;;
+            *) systemctl --no-block '{{ action }}' fse-runner.service ;;
+          esac
+          systemctl show fse-runner.service --no-pager -p ActiveState -p SubState -p Result -p ExecMainStatus -p ActiveEnterTimestamp -p NRestarts

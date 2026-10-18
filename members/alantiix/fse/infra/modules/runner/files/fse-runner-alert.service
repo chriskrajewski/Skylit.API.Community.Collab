@@ -1,0 +1,8 @@
+# Started by fse-runner.service OnFailure= once systemd stops restarting it.
+[Unit]
+Description=Alert: fse-runner gave up after repeated failures
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/fse/host.env
+ExecStart=/usr/local/bin/fse-alert.sh gave-up

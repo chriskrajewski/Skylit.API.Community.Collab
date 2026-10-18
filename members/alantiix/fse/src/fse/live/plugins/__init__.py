@@ -1,0 +1,92 @@
+"""The public plugin API of ``fse run`` (design 3); plugins import only from here.
+
+Re-exports the types of :mod:`fse.live.plugins.api`, the market types a plugin
+sees (``Bar``, ``Fill``, ``Trade``, ``Snapshot``, ``DarkPoolPrint``, ``Quote``)
+and the host's day clock (:func:`globex_day_at`), so a plugin never names a
+vendor client module.
+"""
+
+from fse.engine.types import (
+    Bar,
+    DarkPoolPrint,
+    Direction,
+    Fill,
+    OrderRole,
+    Snapshot,
+    Ticks,
+    Trade,
+)
+from fse.live.host.dayclock import GlobexDay, globex_day, globex_day_at, next_globex_day
+from fse.live.plugins.api import (
+    BAR_INTERVAL_S,
+    PLUGIN_API_VERSION,
+    TAG_RE,
+    BarNeed,
+    BarStoreView,
+    BrokerTerms,
+    Cancel,
+    CardAction,
+    DataNeeds,
+    EnterMarket,
+    EnterResting,
+    FeedName,
+    Flatten,
+    Intent,
+    ModifyStop,
+    OrderStatus,
+    OrderUpdate,
+    PaperFills,
+    PaperRisk,
+    PluginContext,
+    PluginServices,
+    Quote,
+    SkylitNeed,
+    StrategyPlugin,
+    TargetLeg,
+    TaskStarter,
+    decision_card,
+)
+from fse.timekit import Instant
+
+__all__ = [
+    "BAR_INTERVAL_S",
+    "PLUGIN_API_VERSION",
+    "TAG_RE",
+    "Bar",
+    "BarNeed",
+    "BarStoreView",
+    "BrokerTerms",
+    "Cancel",
+    "CardAction",
+    "DarkPoolPrint",
+    "DataNeeds",
+    "Direction",
+    "EnterMarket",
+    "EnterResting",
+    "FeedName",
+    "Fill",
+    "Flatten",
+    "GlobexDay",
+    "Instant",
+    "Intent",
+    "ModifyStop",
+    "OrderRole",
+    "OrderStatus",
+    "OrderUpdate",
+    "PaperFills",
+    "PaperRisk",
+    "PluginContext",
+    "PluginServices",
+    "Quote",
+    "SkylitNeed",
+    "Snapshot",
+    "StrategyPlugin",
+    "TargetLeg",
+    "TaskStarter",
+    "Ticks",
+    "Trade",
+    "decision_card",
+    "globex_day",
+    "globex_day_at",
+    "next_globex_day",
+]

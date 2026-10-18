@@ -1,0 +1,230 @@
+{
+ "fse account reset": [
+  "config:value:--config",
+  "id:value:None",
+  "reason:value:--reason",
+  "state_dir:value:--state-dir"
+ ],
+ "fse accounts": [
+  "json:flag:--json"
+ ],
+ "fse backtest": [
+  "cache_dir:value:--cache-dir",
+  "calendar_dir:value:--calendar-dir",
+  "config:value:--config",
+  "end:value:--end",
+  "offline:flag:--offline",
+  "out:value:--out",
+  "seed:value:--seed",
+  "start:value:--start"
+ ],
+ "fse backtest-plugin": [
+  "allow_gaps:flag:--allow-gaps",
+  "cache_dir:value:--cache-dir",
+  "config:value:--config",
+  "coverage_only:flag:--coverage-only",
+  "first:value:--first",
+  "history:value:--history",
+  "lag_s:value:--lag-s",
+  "last:value:--last",
+  "out:value:--out",
+  "plugin:append:--plugin",
+  "recordings_root:value:--recordings-root",
+  "recordings_s3:value:--recordings-s3"
+ ],
+ "fse calibrate regime-min-abs": [
+  "cache_dir:value:--cache-dir",
+  "calendar_dir:value:--calendar-dir",
+  "end:value:--end",
+  "expirations:value:--expirations",
+  "include_empty:flag:--include-empty",
+  "max_expirations:value:--max-expirations",
+  "max_strikes:value:--max-strikes",
+  "percentile:value:--percentile",
+  "start:value:--start",
+  "symbol:value:--symbol"
+ ],
+ "fse clear": [
+  "state_dir:value:--state-dir"
+ ],
+ "fse day-loss-reset": [
+  "plugin:value:--plugin",
+  "reason:value:--reason",
+  "state_dir:value:--state-dir"
+ ],
+ "fse drafts build": [
+  "baseline:value:--baseline",
+  "cache_dir:value:--cache-dir",
+  "calendar_dir:value:--calendar-dir",
+  "chosen:value:--chosen",
+  "end:value:--end",
+  "holdout_log:value:--holdout-log",
+  "out:value:--out",
+  "seed:value:--seed",
+  "skill_root:value:--skill-root",
+  "start:value:--start",
+  "traceability:value:--traceability",
+  "workers:value:--workers"
+ ],
+ "fse drafts promote": [
+  "draft:value:--draft",
+  "skill_root:value:--skill-root"
+ ],
+ "fse experiment ablation": [
+  "cache_dir:value:--cache-dir",
+  "calendar_dir:value:--calendar-dir",
+  "config:value:--config",
+  "end:value:--end",
+  "out:value:--out",
+  "seed:value:--seed",
+  "start:value:--start",
+  "workers:value:--workers"
+ ],
+ "fse experiment cadence": [
+  "cache_dir:value:--cache-dir",
+  "cadences:value:--cadences",
+  "calendar_dir:value:--calendar-dir",
+  "config:value:--config",
+  "end:value:--end",
+  "out:value:--out",
+  "seed:value:--seed",
+  "start:value:--start",
+  "workers:value:--workers"
+ ],
+ "fse experiment holdout": [
+  "cache_dir:value:--cache-dir",
+  "calendar_dir:value:--calendar-dir",
+  "config:value:--config",
+  "holdout_log:value:--holdout-log",
+  "out:value:--out",
+  "seed:value:--seed"
+ ],
+ "fse experiment montecarlo": [
+  "config:value:--config",
+  "out:value:--out",
+  "run:value:--run",
+  "runs_dir:value:--runs-dir",
+  "seed:value:--seed"
+ ],
+ "fse experiment sweep": [
+  "cache_dir:value:--cache-dir",
+  "calendar_dir:value:--calendar-dir",
+  "config:value:--config",
+  "end:value:--end",
+  "out:value:--out",
+  "seed:value:--seed",
+  "start:value:--start",
+  "sweep:value:--sweep",
+  "workers:value:--workers"
+ ],
+ "fse experiment walkforward": [
+  "cache_dir:value:--cache-dir",
+  "calendar_dir:value:--calendar-dir",
+  "candidate:append:--candidate",
+  "config:value:--config",
+  "end:value:--end",
+  "objective:value:--objective",
+  "out:value:--out",
+  "seed:value:--seed",
+  "start:value:--start",
+  "sweep:value:--sweep",
+  "workers:value:--workers"
+ ],
+ "fse export-aws": [
+  "bucket:value:--bucket",
+  "cache_dir:value:--cache-dir",
+  "datasets:value:--datasets",
+  "dry_run:flag:--dry-run",
+  "glue_database:value:--glue-database",
+  "months:value:--months",
+  "prefix:value:--prefix",
+  "profile:value:--profile",
+  "region:value:--region",
+  "stage_only:flag:--stage-only",
+  "staging_dir:value:--staging-dir",
+  "symbols:value:--symbols"
+ ],
+ "fse halt": [
+  "reason:value:--reason",
+  "state_dir:value:--state-dir"
+ ],
+ "fse import-vix": [
+  "cache_dir:value:--cache-dir",
+  "calendar_dir:value:--calendar-dir",
+  "csv:value:None"
+ ],
+ "fse live": [
+  "cache_dir:value:--cache-dir",
+  "calendar_dir:value:--calendar-dir",
+  "config:value:--config",
+  "live_orders:flag:--live-orders",
+  "out:value:--out",
+  "recordings_root:value:--recordings-root",
+  "state_dir:value:--state-dir"
+ ],
+ "fse paper": [
+  "cache_dir:value:--cache-dir",
+  "calendar_dir:value:--calendar-dir",
+  "config:value:--config",
+  "out:value:--out",
+  "recordings_root:value:--recordings-root",
+  "state_dir:value:--state-dir"
+ ],
+ "fse pull": [
+  "bar_interval:value:--bar-interval",
+  "cache_dir:value:--cache-dir",
+  "calendar_dir:value:--calendar-dir",
+  "config:value:--config",
+  "dark_pool:flag:--dark-pool",
+  "dark_pool_tickers:value:--dark-pool-tickers",
+  "end:value:--end",
+  "expirations:value:--expirations",
+  "historical_credits:value:--historical-credits",
+  "include_empty:flag:--include-empty",
+  "instruments:value:--instruments",
+  "label_sample_minutes:value:--label-sample-minutes",
+  "layout:value:--layout",
+  "max_expirations:value:--max-expirations",
+  "max_strikes:value:--max-strikes",
+  "out:value:--out",
+  "pull_window:value:--pull-window",
+  "range_credits:value:--range-credits",
+  "sample_interval_min:value:--sample-interval-min",
+  "size_limit_gb:value:--size-limit-gb",
+  "start:value:--start",
+  "storage_interval_s:value:--storage-interval-s",
+  "symbols:value:--symbols"
+ ],
+ "fse pull-equity-bars": [
+  "cache_dir:value:--cache-dir",
+  "calendar_dir:value:--calendar-dir",
+  "dry_run:flag:--dry-run",
+  "end:value:--end",
+  "interval:value:--interval",
+  "out:value:--out",
+  "start:value:--start",
+  "symbols:value:--symbols"
+ ],
+ "fse report": [
+  "run:value:--run",
+  "runs_dir:value:--runs-dir"
+ ],
+ "fse run": [
+  "bar_store:value:--bar-store",
+  "cache_dir:value:--cache-dir",
+  "calendar_dir:value:--calendar-dir",
+  "config:value:--config",
+  "live_orders:flag:--live-orders",
+  "out:value:--out",
+  "plugin_orders:flag:--plugin-orders",
+  "recordings_root:value:--recordings-root",
+  "state_dir:value:--state-dir",
+  "until:value:--until"
+ ],
+ "fse scan-secrets": [
+  "repo:value:--repo"
+ ],
+ "fse skilldocs check": [
+  "skill_root:value:--skill-root"
+ ]
+}

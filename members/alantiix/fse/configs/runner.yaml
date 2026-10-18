@@ -1,0 +1,87 @@
+# Runner config for `fse run` (design 11.1): the data plane and the strategy plugins.
+#
+# - Paper by default: every host-brokered plugin trades its own in-process paper book.
+#   A plugin may opt into ProjectX orders with `execution:` (see README). This file
+#   ships every plugin on paper.
+# - The data plane runs whatever the plugins need: ProjectX 1-minute bars (REST,
+#   triggered by the market hub when it connects) and quotes, the Skylit stream, all
+#   recorded per Globex day, closed bars also in the bar store (paths.bar_store).
+# - Keys not written here take their schema default (src/fse/live/host/config.py).
+# - Never put an account name, account id or credential in this file. Credentials
+#   come from the environment: SKYLIT_API_KEY, PROJECTX_USERNAME, PROJECTX_API_KEY.
+version: 1
+
+paths:                                      # all optional; CLI flags override
+  state_dir: ~/.skylit-fse/live-state
+  recordings_root: ~/.skylit-fse
+  out_root: ~/.skylit-fse/runs              # run dir: <out_root>/run-<UTC stamp>-<hex8>/
+  bar_store: ~/.skylit-fse/live-bars
+  cache_dir: ~/.skylit-fse/cache
+  calendar_dir: null                        # null: the Project's calendars/
+
+data_plane:
+  instruments: [MNQ, MES]
+  projectx:
+    transport: auto                         # auto | stream | polling
+    subscription: sim                       # auto | live | sim. sim: for a login with no live data subscription (live=true retrieveBars fails, errorCode 1); sim bars are real time, ~2-3 s after close
+    poll_interval_s: 5
+    hot_poll_interval_s: 1
+    rtc_url: https://rtc.topstepx.com/hubs/market
+    record_quotes: sampled_1s               # off | sampled_1s | all
+    backfill_sessions: 20
+    expected_contracts: {}                  # instrument -> ProjectX contract id fallback
+  skylit:
+    enabled: true
+    mode: stream                            # stream | polling
+    refresh_interval_s: 15
+    symbols: [QQQ, SPY]
+    heatmap_view: {}
+    window: {start: "09:00", end: "16:15"}  # NY; no Skylit request outside sessions
+    dark_pool: {enabled: false, tickers: []}
+
+plugins:
+  # A runnable example plugin (src/fse/live/plugins/template.py): copy it to start a new
+  # strategy, or add your own under research/<name>/plugin.py and list it here as
+  # `module: research.<name>.plugin:Class` (research/README.md). Enabled so the runner has
+  # one plugin to host; it paper-trades one position a day on the data plane.
+  - id: template
+    module: fse.live.plugins.template:TemplatePlugin
+    enabled: true
+    config: {instrument: MNQ, entry_time: "10:00", direction: long, qty: 1,
+             stop_ticks: 40, target_ticks: 40, flatten_time: "15:55", warmup_bars: 5}
+    fills:
+      trade_through_ticks: 1
+      slippage_ticks: 0
+      stop_fill: at_stop
+      commission_rt: {MNQ: "1.24"}
+    risk:
+      max_contracts: 1
+      max_open_trades: 1
+    hold_through_break: false
+    # execution:                          # ProjectX orders (off). Practice first; see README
+    #   order_mode: practice              # paper | practice | combine (combine also needs --live-orders)
+    # Non-paper also needs: risk.max_daily_loss, risk.max_trades_per_day,
+    # hold_through_break: false, an instrument the broker trades (not MGC/SIL),
+    # the start flag --plugin-orders, and FSE_RUN_PLUGIN_ORDERS=enabled plus
+    # PRACTICE_ACCOUNT_ID in the environment. Only one plugin per config may be non-paper.
+    # Local only: FSE_RUN_PLUGIN_ORDERS=enabled fse run --plugin-orders --config ...
+    # AWS console (Practice or Combine via Live -> Order mode; fse live stays unavailable).
+    # Precondition: the fse-production GitHub environment has a required reviewer and
+    # deployment branches limited to your release branch. See ui/README.md "Console
+    # Practice and Combine orders".
+    # 1) Repo var FSE_PLUGIN_ORDERS_ENABLED=true; run the fse-infra workflow from your
+    #    release branch with apply.
+    # 2) Live -> Runner -> Restart (host rewrites /run/fse-control/plugin_orders; runner
+    #    then passes --plugin-orders and --live-orders).
+    # 3) Settings -> Secrets: PROJECTX_*; Practice needs PRACTICE_ACCOUNT_ID (≠ combine);
+    #    Combine needs COMBINE_ACCOUNT_ID and a paper account with flat deadline on.
+    # 4) Live -> <plugin id> -> Order mode -> Practice or Combine; enter caps; confirm restart.
+    # Off: Halt, flatten in TopstepX if needed, apply false, Restart.
+
+  # The Skylit Playbook (wraps LiveSession, brokers itself). Ships disabled: the
+  # baseline config exits 2 until its fees are set.
+  - id: playbook
+    module: fse.live.plugins.playbook:PlaybookPlugin
+    enabled: false
+    config:
+      strategy_config: configs/playbook_baseline.yaml

@@ -1,0 +1,169 @@
+# OPERATOR: PLEASE VERIFY THIS FILE before you rely on any backtest or live run.
+# Check the roll dates against the sources below and against the contract your
+# bar source and broker actually serve. Before each quarter, add the next
+# contract and move `covers.last`.
+#
+# Futures roll calendar (Req 4.5), read by `fse.calendars`. A missing file, an
+# invalid entry, or a run session outside `covers` stops the run before the
+# first Decision_Time with exit code 2 (Req 4.16).
+#
+# Sources (checked 2026-10-03):
+#   CME Group equity index roll dates:
+#     https://www.cmegroup.com/trading/equity-index/rolldates.html
+#   CME Group E-mini S&P 500 and E-mini Nasdaq-100 contract specs (quarterly
+#   March, June, September and December contracts):
+#     https://www.cmegroup.com/markets/equities/sp/e-mini-sandp500.contractSpecs.html
+#     https://www.cmegroup.com/markets/equities/nasdaq/e-mini-nasdaq-100.contractSpecs.html
+#
+# Conventions:
+#   - Each entry assigns one contract to every session from `first` to `last`,
+#     both inclusive. Every bar of a session, including the bars from 18:00 the
+#     evening before, comes from that contract (Req 4.5). A session with no
+#     entry has no contract; the coverage report records it (Req 4.8).
+#   - Roll rule: CME's published equity roll date, the Monday before the third
+#     Friday of the expiration month. From that session on, the next quarterly
+#     contract is used. The 2026 dates (03-16, 06-15, 09-14, 12-14) match CME's
+#     page as quoted by other sites; cmegroup.com refused automated downloads.
+#     The same rule is applied to 2023-2025. Some platforms roll on the
+#     Thursday eight days before expiration instead; compare with your data.
+#   - June 2026: the third Friday (2026-06-19) is the Juneteenth holiday; the
+#     roll date is still Monday 2026-06-15.
+#   - Roll dates from 2024-03 on follow the Atlas continuous-symbol switch
+#     (detected 2026-10-05 from 60-minute and 1-minute Atlas bars), not the
+#     CME roll date. This overrides the roll rule above and the "not on the
+#     dates below" note under atlas_symbol. The 2023 entries keep the CME
+#     dates (Atlas has no bars before the 2024-01-02 session).
+#     Observed rule: each symbol switches at 00:00 UTC (20:00 ET in daylight
+#     time, 19:00 ET in standard time) on the Tuesday or the Wednesday of the
+#     expiry week, never during RTH. The new contract starts with the next
+#     session, the first whose RTH is entirely on the new contract; the old
+#     contract ends the session before. ES1 and MES1 switched on Tuesday in all
+#     11 quarters. NQ1 and MNQ1 switched on Wednesday in some quarters, and
+#     not always together.
+#     Projected: the 2026-12 roll has no data yet. It assumes a Tuesday
+#     2026-12-15 switch for ES, MES and NQ (new contract from 2026-12-16) and
+#     a Wednesday 2026-12-16 switch for MNQ (from 2026-12-17). Check these
+#     entries against Atlas bars after the roll. The projected 2026-12 mixed
+#     sessions carry a `note`.
+#     Mixed sessions: the bars from 18:00 the evening before up to the switch
+#     come from the old contract, so the session holds a price jump of about
+#     50-75 points (ES, MES) or 200-320 points (NQ, MNQ). Every such session
+#     is listed under `mixed_sessions:` at the end of this file (switch = New
+#     York time, the evening before the session). The Backtester and every
+#     experiment skip them and record the skip as `mixed_roll_session`.
+#     June 2024 has no mixed session: the switch was 2024-06-18 20:00 ET, the
+#     2024-06-19 Juneteenth holiday is not a session, and the 2024-06-20
+#     session (from 18:00 on 06-19) is all new contract.
+#     Live trading: the ProjectX front month may switch earlier than these
+#     dates, so the Live_Runner contract check (Req 24.11-24.12) can block an
+#     instrument for a few days per quarter. The Operator accepted this.
+#   - Contract codes use CME Globex single-digit years: ESZ6 is December 2026.
+#   - atlas_symbol: Atlas serves no per-contract tickers (a search for a
+#     contract code such as MESZ6 matched nothing). It serves the continuous front-month symbols ES1,
+#     NQ1, MES1 and MNQ1 (type futures, exchange CME), confirmed with Atlas
+#     GET /v1/search and GET /v1/history on 2026-10-05, so every entry names
+#     its instrument's continuous symbol. The continuous symbol rolls on its
+#     own schedule, not on the dates below: MNQ1 still served MNQU6 on the
+#     2026-09-14 to 2026-09-16 sessions and switched to MNQZ6 around 20:00 ET on
+#     2026-09-16. Intraday Atlas bars start with the 2024-01-02 session.
+#   - projectx_contract_id is optional; add it once resolved with the ProjectX
+#     contract search, for example:
+#       - {first: 2026-12-14, last: 2026-12-31, contract: ESH7,
+#          atlas_symbol: ES1, projectx_contract_id: <ProjectX id>}
+#     The Live_Runner compares the ProjectX front-month id with this file at
+#     each session start and blocks the instrument on a mismatch (Req 24.11-24.12).
+#   - Dates are YYYY-MM-DD.
+
+covers:
+  first: 2023-03-28
+  last: 2026-12-31
+
+instruments:
+  ES:
+    - {first: 2023-03-28, last: 2023-06-09, contract: ESM3, atlas_symbol: ES1}
+    - {first: 2023-06-12, last: 2023-09-08, contract: ESU3, atlas_symbol: ES1}
+    - {first: 2023-09-11, last: 2023-12-08, contract: ESZ3, atlas_symbol: ES1}
+    - {first: 2023-12-11, last: 2024-03-12, contract: ESH4, atlas_symbol: ES1}
+    - {first: 2024-03-13, last: 2024-06-18, contract: ESM4, atlas_symbol: ES1}
+    - {first: 2024-06-20, last: 2024-09-17, contract: ESU4, atlas_symbol: ES1}
+    - {first: 2024-09-18, last: 2024-12-17, contract: ESZ4, atlas_symbol: ES1}
+    - {first: 2024-12-18, last: 2025-03-18, contract: ESH5, atlas_symbol: ES1}
+    - {first: 2025-03-19, last: 2025-06-17, contract: ESM5, atlas_symbol: ES1}
+    - {first: 2025-06-18, last: 2025-09-16, contract: ESU5, atlas_symbol: ES1}
+    - {first: 2025-09-17, last: 2025-12-16, contract: ESZ5, atlas_symbol: ES1}
+    - {first: 2025-12-17, last: 2026-03-17, contract: ESH6, atlas_symbol: ES1}
+    - {first: 2026-03-18, last: 2026-06-16, contract: ESM6, atlas_symbol: ES1}
+    - {first: 2026-06-17, last: 2026-09-15, contract: ESU6, atlas_symbol: ES1, projectx_contract_id: CON.F.US.EP.U26}
+    - {first: 2026-09-16, last: 2026-12-15, contract: ESZ6, atlas_symbol: ES1, projectx_contract_id: CON.F.US.EP.Z26}  # last: projected
+    - {first: 2026-12-16, last: 2026-12-31, contract: ESH7, atlas_symbol: ES1, projectx_contract_id: CON.F.US.EP.H27}  # first: projected
+  NQ:
+    - {first: 2023-03-28, last: 2023-06-09, contract: NQM3, atlas_symbol: NQ1}
+    - {first: 2023-06-12, last: 2023-09-08, contract: NQU3, atlas_symbol: NQ1}
+    - {first: 2023-09-11, last: 2023-12-08, contract: NQZ3, atlas_symbol: NQ1}
+    - {first: 2023-12-11, last: 2024-03-12, contract: NQH4, atlas_symbol: NQ1}
+    - {first: 2024-03-13, last: 2024-06-18, contract: NQM4, atlas_symbol: NQ1}
+    - {first: 2024-06-20, last: 2024-09-17, contract: NQU4, atlas_symbol: NQ1}
+    - {first: 2024-09-18, last: 2024-12-18, contract: NQZ4, atlas_symbol: NQ1}
+    - {first: 2024-12-19, last: 2025-03-19, contract: NQH5, atlas_symbol: NQ1}
+    - {first: 2025-03-20, last: 2025-06-17, contract: NQM5, atlas_symbol: NQ1}
+    - {first: 2025-06-18, last: 2025-09-17, contract: NQU5, atlas_symbol: NQ1}
+    - {first: 2025-09-18, last: 2025-12-16, contract: NQZ5, atlas_symbol: NQ1}
+    - {first: 2025-12-17, last: 2026-03-17, contract: NQH6, atlas_symbol: NQ1}
+    - {first: 2026-03-18, last: 2026-06-16, contract: NQM6, atlas_symbol: NQ1}
+    - {first: 2026-06-17, last: 2026-09-15, contract: NQU6, atlas_symbol: NQ1, projectx_contract_id: CON.F.US.ENQ.U26}
+    - {first: 2026-09-16, last: 2026-12-15, contract: NQZ6, atlas_symbol: NQ1, projectx_contract_id: CON.F.US.ENQ.Z26}  # last: projected
+    - {first: 2026-12-16, last: 2026-12-31, contract: NQH7, atlas_symbol: NQ1, projectx_contract_id: CON.F.US.ENQ.H27}  # first: projected
+  MES:
+    - {first: 2023-03-28, last: 2023-06-09, contract: MESM3, atlas_symbol: MES1}
+    - {first: 2023-06-12, last: 2023-09-08, contract: MESU3, atlas_symbol: MES1}
+    - {first: 2023-09-11, last: 2023-12-08, contract: MESZ3, atlas_symbol: MES1}
+    - {first: 2023-12-11, last: 2024-03-12, contract: MESH4, atlas_symbol: MES1}
+    - {first: 2024-03-13, last: 2024-06-18, contract: MESM4, atlas_symbol: MES1}
+    - {first: 2024-06-20, last: 2024-09-17, contract: MESU4, atlas_symbol: MES1}
+    - {first: 2024-09-18, last: 2024-12-17, contract: MESZ4, atlas_symbol: MES1}
+    - {first: 2024-12-18, last: 2025-03-18, contract: MESH5, atlas_symbol: MES1}
+    - {first: 2025-03-19, last: 2025-06-17, contract: MESM5, atlas_symbol: MES1}
+    - {first: 2025-06-18, last: 2025-09-16, contract: MESU5, atlas_symbol: MES1}
+    - {first: 2025-09-17, last: 2025-12-16, contract: MESZ5, atlas_symbol: MES1}
+    - {first: 2025-12-17, last: 2026-03-17, contract: MESH6, atlas_symbol: MES1}
+    - {first: 2026-03-18, last: 2026-06-16, contract: MESM6, atlas_symbol: MES1}
+    - {first: 2026-06-17, last: 2026-09-15, contract: MESU6, atlas_symbol: MES1, projectx_contract_id: CON.F.US.MES.U26}
+    - {first: 2026-09-16, last: 2026-12-15, contract: MESZ6, atlas_symbol: MES1, projectx_contract_id: CON.F.US.MES.Z26}  # last: projected
+    - {first: 2026-12-16, last: 2026-12-31, contract: MESH7, atlas_symbol: MES1, projectx_contract_id: CON.F.US.MES.H27}  # first: projected
+  MNQ:
+    - {first: 2023-03-28, last: 2023-06-09, contract: MNQM3, atlas_symbol: MNQ1}
+    - {first: 2023-06-12, last: 2023-09-08, contract: MNQU3, atlas_symbol: MNQ1}
+    - {first: 2023-09-11, last: 2023-12-08, contract: MNQZ3, atlas_symbol: MNQ1}
+    - {first: 2023-12-11, last: 2024-03-12, contract: MNQH4, atlas_symbol: MNQ1}
+    - {first: 2024-03-13, last: 2024-06-18, contract: MNQM4, atlas_symbol: MNQ1}
+    - {first: 2024-06-20, last: 2024-09-17, contract: MNQU4, atlas_symbol: MNQ1}
+    - {first: 2024-09-18, last: 2024-12-18, contract: MNQZ4, atlas_symbol: MNQ1}
+    - {first: 2024-12-19, last: 2025-03-19, contract: MNQH5, atlas_symbol: MNQ1}
+    - {first: 2025-03-20, last: 2025-06-17, contract: MNQM5, atlas_symbol: MNQ1}
+    - {first: 2025-06-18, last: 2025-09-17, contract: MNQU5, atlas_symbol: MNQ1}
+    - {first: 2025-09-18, last: 2025-12-17, contract: MNQZ5, atlas_symbol: MNQ1}
+    - {first: 2025-12-18, last: 2026-03-18, contract: MNQH6, atlas_symbol: MNQ1}
+    - {first: 2026-03-19, last: 2026-06-16, contract: MNQM6, atlas_symbol: MNQ1}
+    - {first: 2026-06-17, last: 2026-09-16, contract: MNQU6, atlas_symbol: MNQ1, projectx_contract_id: CON.F.US.MNQ.U26}
+    - {first: 2026-09-17, last: 2026-12-16, contract: MNQZ6, atlas_symbol: MNQ1, projectx_contract_id: CON.F.US.MNQ.Z26}  # last: projected
+    - {first: 2026-12-17, last: 2026-12-31, contract: MNQH7, atlas_symbol: MNQ1, projectx_contract_id: CON.F.US.MNQ.H27}  # first: projected
+
+mixed_sessions:
+  - {session: 2024-03-13, instruments: [ES, MES, NQ, MNQ], switch: "20:00"}
+  - {session: 2024-09-18, instruments: [ES, MES, NQ, MNQ], switch: "20:00"}
+  - {session: 2024-12-18, instruments: [ES, MES], switch: "19:00"}
+  - {session: 2024-12-19, instruments: [NQ, MNQ], switch: "19:00"}
+  - {session: 2025-03-19, instruments: [ES, MES], switch: "20:00"}
+  - {session: 2025-03-20, instruments: [NQ, MNQ], switch: "20:00"}
+  - {session: 2025-06-18, instruments: [ES, MES, NQ, MNQ], switch: "20:00"}
+  - {session: 2025-09-17, instruments: [ES, MES], switch: "20:00"}
+  - {session: 2025-09-18, instruments: [NQ, MNQ], switch: "20:00"}
+  - {session: 2025-12-17, instruments: [ES, MES, NQ], switch: "19:00"}
+  - {session: 2025-12-18, instruments: [MNQ], switch: "19:00"}
+  - {session: 2026-03-18, instruments: [ES, MES, NQ], switch: "20:00"}
+  - {session: 2026-03-19, instruments: [MNQ], switch: "20:00"}
+  - {session: 2026-06-17, instruments: [ES, MES, NQ, MNQ], switch: "20:00"}
+  - {session: 2026-09-16, instruments: [ES, MES, NQ], switch: "20:00"}
+  - {session: 2026-09-17, instruments: [MNQ], switch: "20:00"}
+  - {session: 2026-12-16, instruments: [ES, MES, NQ], switch: "19:00", note: "projected: check against Atlas bars after the roll"}
+  - {session: 2026-12-17, instruments: [MNQ], switch: "19:00", note: "projected: check against Atlas bars after the roll"}

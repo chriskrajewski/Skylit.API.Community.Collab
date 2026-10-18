@@ -1,0 +1,12 @@
+# Copy the bars part of the Data_Cache from S3 to /data/cache (fse-sync-cache.sh).
+# Installed by the fse-ui-host-bundle SSM document (modules/ui_host).
+[Unit]
+Description=fse cache sync (S3 to /data/cache)
+Wants=network-online.target
+After=network-online.target data.mount
+RequiresMountsFor=/data
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/fse/host.env
+ExecStart=/usr/local/bin/fse-sync-cache.sh
+TimeoutStartSec=700

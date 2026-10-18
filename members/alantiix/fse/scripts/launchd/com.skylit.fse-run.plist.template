@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The paper forward test `fse run` (scripts/run_paper.sh, configs/runner.paper.yaml).
+  Rendered and bootstrapped by scripts/launchd/install.sh; never copied to
+  ~/Library/LaunchAgents, so it does not start at login.
+  KeepAlive SuccessfulExit=false: launchd restarts the run after a non-zero exit (crash,
+  feed stop, plugin fault), at most once per ThrottleInterval, and leaves it stopped after
+  exit 0 (the end of - -until, or a SIGTERM from `launchctl bootout`). Per launchd.plist(5)
+  SuccessfulExit implies RunAtLoad, so bootstrapping the job starts the run: install.sh
+  is the start command, uninstall.sh the stop command.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>@LABEL@</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>@ENGINE_DIR@/scripts/run_paper.sh</string>
+@RUN_ARGS@
+  </array>
+  <key>WorkingDirectory</key>
+  <string>@ENGINE_DIR@</string>
+  <key>RunAtLoad</key>
+  <false/>
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+  <key>ThrottleInterval</key>
+  <integer>60</integer>
+  <key>ExitTimeOut</key>
+  <integer>60</integer>
+  <key>ProcessType</key>
+  <string>Standard</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>FSE_LOG_DIR</key>
+    <string>@LOG_DIR@</string>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>@LOG_DIR@/launchd-fse-run.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>@LOG_DIR@/launchd-fse-run.err.log</string>
+</dict>
+</plist>

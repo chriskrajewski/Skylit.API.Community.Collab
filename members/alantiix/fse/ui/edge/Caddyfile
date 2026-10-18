@@ -1,0 +1,29 @@
+{
+	admin off
+	persist_config off
+	auto_https disable_redirects
+	servers {
+		protocols h1 h2
+	}
+}
+
+{$FSE_EDGE_SITE} {
+	tls {
+		issuer acme {
+			dns route53 {
+				hosted_zone_id {$FSE_EDGE_ZONE_ID}
+				region {$FSE_EDGE_AWS_REGION}
+				wait_for_propagation true
+			}
+			propagation_timeout -1
+		}
+	}
+	@origin header X-Origin-Verify {$ORIGIN_SECRET}
+	handle @origin {
+		request_header -X-Origin-Verify
+		reverse_proxy 127.0.0.1:8080
+	}
+	handle {
+		respond "forbidden" 403
+	}
+}

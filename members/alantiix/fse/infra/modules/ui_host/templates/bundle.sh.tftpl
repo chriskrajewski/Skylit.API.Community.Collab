@@ -1,0 +1,87 @@
+#!/bin/bash
+# fse-ui-host-bundle: install the console units and host scripts on the runner
+# host. Rendered by modules/ui_host/documents.tf; the scripts and units come
+# from modules/ui_host/files/ as template variables (never re-templated). The
+# association re-runs this whenever the document content changes.
+# It never restarts fse-runner: the drop-in applies at its next restart.
+set -euo pipefail
+
+install -d -m 0755 -o root -g root /etc/fse /etc/systemd/system/fse-runner.service.d /var/lib/fse-host
+install -d -m 0700 -o root -g root /var/lib/fse-edge
+
+install -m 0644 -o root -g root /dev/stdin /etc/fse/ui.env <<'FSE_EOF'
+${ui_env}
+FSE_EOF
+
+install -m 0755 -o root -g root /dev/stdin /usr/local/bin/fse-ui-fetch-env.sh <<'FSE_EOF'
+${fetch_env}
+FSE_EOF
+
+install -m 0755 -o root -g root /dev/stdin /usr/local/bin/fse-ui-start.sh <<'FSE_EOF'
+${ui_start}
+FSE_EOF
+
+install -m 0755 -o root -g root /dev/stdin /usr/local/bin/fse-edge-start.sh <<'FSE_EOF'
+${edge_start}
+FSE_EOF
+
+install -m 0755 -o root -g root /dev/stdin /usr/local/bin/fse-runner-mode.sh <<'FSE_EOF'
+${runner_mode}
+FSE_EOF
+
+install -m 0755 -o root -g root /dev/stdin /usr/local/bin/fse-console-start.sh <<'FSE_EOF'
+${console_start}
+FSE_EOF
+install -m 0755 -o root -g root /dev/stdin /usr/local/bin/fse-runner-state.sh <<'FSE_EOF'
+${runner_state}
+FSE_EOF
+install -m 0755 -o root -g root /dev/stdin /usr/local/bin/fse-sync-cache.sh <<'FSE_EOF'
+${sync_cache}
+FSE_EOF
+install -m 0644 -o root -g root /dev/stdin /etc/systemd/system/fse-cache-sync.service <<'FSE_EOF'
+${cache_sync_unit}
+FSE_EOF
+install -m 0644 -o root -g root /dev/stdin /etc/systemd/system/fse-cache-sync.timer <<'FSE_EOF'
+${cache_sync_timer}
+FSE_EOF
+install -m 0755 -o root -g root /dev/stdin /usr/local/bin/fse-offload-recordings.sh <<'FSE_EOF'
+${offload_script}
+FSE_EOF
+install -m 0644 -o root -g root /dev/stdin /etc/systemd/system/fse-offload-recordings.service <<'FSE_EOF'
+${offload_unit}
+FSE_EOF
+install -m 0644 -o root -g root /dev/stdin /etc/systemd/system/fse-offload-recordings.timer <<'FSE_EOF'
+${offload_timer}
+FSE_EOF
+
+install -m 0644 -o root -g root /dev/stdin /etc/systemd/system/fse-ui.service <<'FSE_EOF'
+${ui_unit}
+FSE_EOF
+
+install -m 0644 -o root -g root /dev/stdin /etc/systemd/system/fse-edge.service <<'FSE_EOF'
+${edge_unit}
+FSE_EOF
+
+install -m 0644 -o root -g root /dev/stdin /etc/systemd/system/fse-runner.service.d/20-console.conf <<'FSE_EOF'
+${dropin}
+FSE_EOF
+
+systemctl daemon-reload
+systemctl enable fse-ui.service fse-edge.service
+# Cache sync: enable the timer now; run one sync in the background (no wait, no
+# failure: the next timer tick retries). It never restarts fse-runner.
+systemctl enable --now fse-cache-sync.timer
+systemctl start --no-block fse-cache-sync.service || true
+# Recordings offload: hourly; the first run comes from the timer.
+systemctl enable --now fse-offload-recordings.timer
+
+# Before the first deploy the fse-ui and fse-edge images are not in ECR: leave
+# the units enabled but stopped. The deploy sets the tag and restarts them.
+tag="$(aws ssm get-parameter --region ${region} --name ${ssm_prefix}/image_tag --query Parameter.Value --output text)"
+if [ -n "$tag" ] && [ "$tag" != "none" ]; then
+  systemctl reset-failed fse-ui.service fse-edge.service || true
+  systemctl restart --no-block fse-ui.service fse-edge.service
+  echo "fse-ui and fse-edge restarting"
+else
+  echo "fse-ui and fse-edge enabled, not started: no image deployed yet"
+fi
