@@ -1,0 +1,14 @@
+<!-- @dsCard group="Components" viewport="700x260" name="Data table" subtitle="DataTable — dense, clickable, selected row" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<style>body{padding:20px;background:var(--surface-page)}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.col{display:flex;flex-direction:column;gap:14px}.lbl{font:var(--type-micro);letter-spacing:var(--ls-caps);text-transform:uppercase;color:var(--text-disabled);width:72px;flex:none}</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script></head><body><div id="root"></div>
+<script type="text/babel">
+const { DataTable, Badge, Sparkline } = window.FseDesignSystem_043819;
+function App(){ const [sel,setSel]=React.useState('bt_8f2c41');
+const rows=[{id:'bt_8f2c41',cfg:'playbook_baseline',ses:248,tr:38,wr:'44.7',ex:0.31,c:[0,1,.4,2,1.6,3.2,4]},{id:'bt_77a019',cfg:'baseline · −dark_pool',ses:248,tr:41,wr:'41.5',ex:0.22,c:[0,.5,1,.2,1.8,2.1,2.6]},{id:'bt_3e90cd',cfg:'baseline · rr 2.5',ses:248,tr:57,wr:'38.6',ex:-0.04,c:[0,.8,-.2,.4,-.6,-.1,-.3]},{id:'bt_c1d2aa',cfg:'baseline · 5m',ses:244,tr:29,wr:'48.3',ex:0.4,c:[0,1,2,1.4,2.6,3.5,4.2]}];
+return <div style={{border:'1px solid var(--border-subtle)',borderRadius:6,overflow:'hidden'}}><DataTable dense rows={rows} selectedKey={sel} onRowClick={r=>setSel(r.id)} columns={[{key:'id',label:'Run',muted:true},{key:'cfg',label:'Config'},{key:'ses',label:'Sessions',align:'right'},{key:'tr',label:'Trades',align:'right'},{key:'wr',label:'Win %',align:'right'},{key:'ex',label:'Exp R',align:'right',render:v=><span className={v>0?'fse-pos':'fse-neg'}>{(v>0?'+':'')+v.toFixed(2)}</span>},{key:'c',label:'Curve',render:v=><Sparkline values={v} width={80} height={16} tone="auto"/>}]}/></div>; }
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script></body></html>

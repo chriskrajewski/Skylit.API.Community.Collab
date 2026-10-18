@@ -1,0 +1,27 @@
+# Local secrets. Copy .env.example to .env; never commit .env.
+.env
+
+# Default output directory names. Outputs default to ~/.skylit-fse/, outside the
+# repository. These entries cover outputs the Operator points inside this folder,
+# since they hold Skylit Snapshot values, bars or dark-pool prints.
+cache/
+runs/
+recordings/
+live-state/
+logs/
+
+# Terraform working dirs, state, plans and per-account settings. Commit
+# .terraform.lock.hcl; never commit these.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+infra/backend.hcl
+infra/terraform.tfvars
+# fse console
+ui/api/.venv/
+ui/web/node_modules/
+ui/web/dist/
+ui/web/test-results/
+ui/web/playwright-report/
+ui/web/*.tsbuildinfo

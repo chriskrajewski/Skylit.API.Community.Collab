@@ -1,0 +1,50 @@
+#cloud-config
+# fse runner host (Amazon Linux 2023 arm64). Rendered by modules/runner/main.tf;
+# the scripts and units come from modules/runner/files/. Runs at first boot only
+# (changing it does not replace the instance).
+packages:
+  - docker
+  - amazon-ecr-credential-helper
+
+write_files:
+  - path: /etc/fse/host.env
+    permissions: "0644"
+    content: |
+      ${indent(6, host_env)}
+  - path: /root/.docker/config.json
+    permissions: "0600"
+    content: |
+      ${indent(6, docker_config)}
+  - path: /usr/local/bin/fse-fetch-secrets.sh
+    permissions: "0755"
+    content: |
+      ${indent(6, fetch_secrets)}
+  - path: /usr/local/bin/fse-alert.sh
+    permissions: "0755"
+    content: |
+      ${indent(6, alert)}
+  - path: /usr/local/bin/fse-mount-data.sh
+    permissions: "0755"
+    content: |
+      ${indent(6, mount_data)}
+  - path: /usr/local/bin/fse-start.sh
+    permissions: "0755"
+    content: |
+      ${indent(6, start)}
+  - path: /etc/systemd/system/fse-runner.service
+    permissions: "0644"
+    content: |
+      ${indent(6, runner_unit)}
+  - path: /etc/systemd/system/fse-runner-alert.service
+    permissions: "0644"
+    content: |
+      ${indent(6, alert_unit)}
+
+runcmd:
+  - systemctl enable --now docker
+  - /usr/local/bin/fse-mount-data.sh ${data_volume_id}
+  - systemctl daemon-reload
+  - systemctl enable fse-runner.service
+  # Before the first deploy /fse/image_tag is none: leave the unit enabled but
+  # stopped. The deploy (SSM Run Command) sets the tag and restarts it.
+  - [sh, -c, "set -a; . /etc/fse/host.env; set +a; if /usr/local/bin/fse-fetch-secrets.sh >/dev/null; then systemctl start --no-block fse-runner.service; else echo 'fse-runner not started: no image deployed yet'; fi"]

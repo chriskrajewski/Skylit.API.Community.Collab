@@ -1,0 +1,90 @@
+# Runner config for the paper forward test: the plugins below in one `fse run`.
+# docs/plugin-runner.md "Paper forward test" has the start/stop commands.
+#
+# - Paper only: every host-brokered plugin trades its own in-process paper book. No order
+#   request is ever sent to ProjectX; there is no order mode here.
+# - The data plane is the one of configs/runner.yaml (ProjectX 1m bars and quotes, the
+#   Skylit stream, all recorded per Globex day).
+# - Each plugin keeps its own fills/risk block, id, paper book, state dir
+#   (<state_dir>/plugins/<id>/) and out dir. Plugins never share a position.
+#   PAPER ONLY: the caps are per plugin; an account-level cap across plugins (shared
+#   position cap, MLL, DLL, flat-by) is opt-in through `accounts:` (see
+#   docs/plugin-runner.md section 7). Do not route this to a real account.
+# - Keys not written here take their schema default (src/fse/live/host/config.py).
+# - Never put an account name, account id or credential in this file. Credentials come
+#   from the environment: SKYLIT_API_KEY, PROJECTX_USERNAME, PROJECTX_API_KEY.
+version: 1
+
+paths:                                      # all optional; CLI flags override
+  state_dir: ~/.skylit-fse/live-state
+  recordings_root: ~/.skylit-fse
+  out_root: ~/.skylit-fse/runs              # run dir: <out_root>/run-<UTC stamp>-<hex8>/
+  bar_store: ~/.skylit-fse/live-bars
+  cache_dir: ~/.skylit-fse/cache
+  calendar_dir: null                        # null: the Project's calendars/
+
+data_plane:
+  instruments: [MNQ, MES]
+  projectx:
+    transport: auto                         # auto | stream | polling
+    subscription: sim                       # auto | live | sim. sim: for a login with no live data subscription (live=true retrieveBars fails, errorCode 1); sim bars are real time, ~2-3 s after close
+    poll_interval_s: 5
+    hot_poll_interval_s: 1
+    rtc_url: https://rtc.topstepx.com/hubs/market
+    record_quotes: sampled_1s               # off | sampled_1s | all
+    backfill_sessions: 20
+    expected_contracts: {}                  # instrument -> ProjectX contract id fallback
+  skylit:
+    enabled: true
+    mode: stream                            # stream | polling
+    refresh_interval_s: 15
+    symbols: [QQQ, SPY]
+    heatmap_view: {}
+    window: {start: "09:00", end: "16:15"}  # NY; no Skylit request outside sessions
+    dark_pool: {enabled: false, tickers: []}
+
+# Paper accounts (docs/plugin-runner.md section 7). Off: no account is configured, so every
+# plugin trades on an implicit, unrestricted account. To use one, uncomment the block and
+# an `account:` line under a host-brokered plugin (the Plugins page edits both).
+# accounts:
+#   - id: topstep_a
+#     preset: topstep_50k_combine           # Topstep 50K Combine rules ($50,000 start)
+#     rules:                                # only what differs from the preset
+#       maximum_loss_limit: {mode: eod_trailing}   # eod_trailing | intraday_trailing | static
+#       no_trade_windows:
+#         - {start: "09:25", end: "09:35"}  # NY, [start, end)
+#     nexus:                                # Skylit Nexus mirror; keep it off unless wanted
+#       enabled: false
+#       account: practice                   # practice | evaluation | funded | agent | env:<VAR>
+#       test_only: true
+#   - id: open_book
+#     preset: none                          # every rule off; balance and P&L only
+#     rules:
+#       starting_balance: {value: "25000.00"}
+
+plugins:
+  # The example plugin (src/fse/live/plugins/template.py). Add your own plugins under
+  # research/<name>/plugin.py and list them here (research/README.md).
+  - id: template
+    module: fse.live.plugins.template:TemplatePlugin
+    enabled: true
+    # account: topstep_a                    # a paper account from `accounts:` (off)
+    config: {instrument: MNQ, entry_time: "10:00", direction: long, qty: 1,
+             stop_ticks: 40, target_ticks: 40, flatten_time: "15:55", warmup_bars: 5}
+    fills:
+      trade_through_ticks: 1
+      slippage_ticks: 0
+      stop_fill: at_stop
+      commission_rt: {MNQ: "1.24"}
+    risk:
+      max_contracts: 1
+      max_open_trades: 1
+    hold_through_break: false
+
+  # The Skylit Playbook (wraps LiveSession, brokers itself). Disabled for the forward test.
+  - id: playbook
+    module: fse.live.plugins.playbook:PlaybookPlugin
+    enabled: false
+    # no `account:`: a self-brokered plugin (no risk block) cannot have a paper account
+    config:
+      strategy_config: configs/playbook_baseline.yaml

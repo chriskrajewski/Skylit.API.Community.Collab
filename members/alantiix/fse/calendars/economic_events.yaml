@@ -1,0 +1,178 @@
+# OPERATOR: PLEASE VERIFY THIS FILE before you rely on any backtest or live run.
+# Check every date and time below against the sources listed here. BLS and the
+# Federal Reserve sometimes move releases (for example during a government
+# shutdown), so re-check upcoming dates before each live week. When a new
+# schedule is published, add its entries and move `covers.last`.
+#
+# Scheduled economic releases (Req 4.14), read by `fse.calendars` and used by
+# the news_window Gate. A missing file, an invalid entry, or a run session
+# outside `covers` stops the run before the first Decision_Time with exit
+# code 2 (Req 4.16).
+#
+# Sources (checked 2026-10-03):
+#   BLS CPI release schedule:
+#     https://www.bls.gov/schedule/news_release/cpi.htm
+#   BLS Employment Situation (NFP) release schedule:
+#     https://www.bls.gov/schedule/news_release/empsit.htm
+#     https://www.bls.gov/cps/publications/release-calendar.htm
+#   BLS revised release dates after the 2025 and 2026 lapses in appropriations:
+#     https://www.bls.gov/bls/2025-lapse-revised-release-dates.htm
+#   BLS archived releases (each one states its release date):
+#     https://www.bls.gov/bls/news-release/cpi.htm
+#     https://www.bls.gov/bls/news-release/empsit.htm
+#   Federal Reserve FOMC meeting calendars:
+#     https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm
+#   FOMC policy statement time (2:00 p.m. Eastern on the meeting's last day):
+#     https://www.federalreserve.gov/newsevents/pressreleases/monetary20240809a.htm
+#
+# Notes:
+#   - CPI and NFP are released at 08:30. FOMC entries are the 14:00 policy
+#     statement of each regularly scheduled meeting (minutes are not listed).
+#     The 2025-08-22 notation vote had no scheduled statement and is left out.
+#   - 2025 shutdown: September 2025 CPI moved to 2025-10-24; October 2025 CPI
+#     was cancelled; November 2025 CPI moved to 2025-12-18. The September 2025
+#     jobs report moved to 2025-11-20; October 2025 had no report of its own
+#     and its payroll data came out with November on 2025-12-16.
+#   - 2026 lapse: the January 2026 jobs report moved from 2026-02-06 to
+#     2026-02-11, and January 2026 CPI from 2026-02-11 to 2026-02-13.
+#   - The bls.gov schedule pages refused automated downloads, so dates were
+#     checked through BLS search listings and archived releases. 2026-11-10
+#     (October 2026 CPI) was confirmed only from a copy of the BLS schedule
+#     at https://www.usinflationcalculator.com/inflation/consumer-price-index-release-schedule/
+#   - Releases on non-session dates (Good Friday 2023-04-07 and 2026-04-03)
+#     are listed; they affect no Decision_Time.
+#
+# Format: one entry per release.
+#   type: CPI, NFP, FOMC, or an Operator-added type in capital letters, digits
+#         or underscores (for example PPI or RETAIL_SALES)
+#   date: YYYY-MM-DD release date
+#   time: "HH:MM" America/New_York release time, 24-hour, quoted
+#   note: optional free text
+
+covers:
+  first: 2023-03-28
+  last: 2026-12-31
+
+events:
+  # ---------------------------------------------------------------- 2023
+  - {type: NFP, date: 2023-04-07, time: "08:30", note: March 2023 Employment Situation}
+  - {type: CPI, date: 2023-04-12, time: "08:30", note: March 2023 CPI}
+  - {type: FOMC, date: 2023-05-03, time: "14:00", note: May 2-3 meeting}
+  - {type: NFP, date: 2023-05-05, time: "08:30", note: April 2023 Employment Situation}
+  - {type: CPI, date: 2023-05-10, time: "08:30", note: April 2023 CPI}
+  - {type: NFP, date: 2023-06-02, time: "08:30", note: May 2023 Employment Situation}
+  - {type: CPI, date: 2023-06-13, time: "08:30", note: May 2023 CPI}
+  - {type: FOMC, date: 2023-06-14, time: "14:00", note: June 13-14 meeting}
+  - {type: NFP, date: 2023-07-07, time: "08:30", note: June 2023 Employment Situation}
+  - {type: CPI, date: 2023-07-12, time: "08:30", note: June 2023 CPI}
+  - {type: FOMC, date: 2023-07-26, time: "14:00", note: July 25-26 meeting}
+  - {type: NFP, date: 2023-08-04, time: "08:30", note: July 2023 Employment Situation}
+  - {type: CPI, date: 2023-08-10, time: "08:30", note: July 2023 CPI}
+  - {type: NFP, date: 2023-09-01, time: "08:30", note: August 2023 Employment Situation}
+  - {type: CPI, date: 2023-09-13, time: "08:30", note: August 2023 CPI}
+  - {type: FOMC, date: 2023-09-20, time: "14:00", note: September 19-20 meeting}
+  - {type: NFP, date: 2023-10-06, time: "08:30", note: September 2023 Employment Situation}
+  - {type: CPI, date: 2023-10-12, time: "08:30", note: September 2023 CPI}
+  - {type: FOMC, date: 2023-11-01, time: "14:00", note: October 31-November 1 meeting}
+  - {type: NFP, date: 2023-11-03, time: "08:30", note: October 2023 Employment Situation}
+  - {type: CPI, date: 2023-11-14, time: "08:30", note: October 2023 CPI}
+  - {type: NFP, date: 2023-12-08, time: "08:30", note: November 2023 Employment Situation}
+  - {type: CPI, date: 2023-12-12, time: "08:30", note: November 2023 CPI}
+  - {type: FOMC, date: 2023-12-13, time: "14:00", note: December 12-13 meeting}
+  # ---------------------------------------------------------------- 2024
+  - {type: NFP, date: 2024-01-05, time: "08:30", note: December 2023 Employment Situation}
+  - {type: CPI, date: 2024-01-11, time: "08:30", note: December 2023 CPI}
+  - {type: FOMC, date: 2024-01-31, time: "14:00", note: January 30-31 meeting}
+  - {type: NFP, date: 2024-02-02, time: "08:30", note: January 2024 Employment Situation}
+  - {type: CPI, date: 2024-02-13, time: "08:30", note: January 2024 CPI}
+  - {type: NFP, date: 2024-03-08, time: "08:30", note: February 2024 Employment Situation}
+  - {type: CPI, date: 2024-03-12, time: "08:30", note: February 2024 CPI}
+  - {type: FOMC, date: 2024-03-20, time: "14:00", note: March 19-20 meeting}
+  - {type: NFP, date: 2024-04-05, time: "08:30", note: March 2024 Employment Situation}
+  - {type: CPI, date: 2024-04-10, time: "08:30", note: March 2024 CPI}
+  - {type: FOMC, date: 2024-05-01, time: "14:00", note: April 30-May 1 meeting}
+  - {type: NFP, date: 2024-05-03, time: "08:30", note: April 2024 Employment Situation}
+  - {type: CPI, date: 2024-05-15, time: "08:30", note: April 2024 CPI}
+  - {type: NFP, date: 2024-06-07, time: "08:30", note: May 2024 Employment Situation}
+  - {type: CPI, date: 2024-06-12, time: "08:30", note: May 2024 CPI}
+  - {type: FOMC, date: 2024-06-12, time: "14:00", note: June 11-12 meeting}
+  - {type: NFP, date: 2024-07-05, time: "08:30", note: June 2024 Employment Situation}
+  - {type: CPI, date: 2024-07-11, time: "08:30", note: June 2024 CPI}
+  - {type: FOMC, date: 2024-07-31, time: "14:00", note: July 30-31 meeting}
+  - {type: NFP, date: 2024-08-02, time: "08:30", note: July 2024 Employment Situation}
+  - {type: CPI, date: 2024-08-14, time: "08:30", note: July 2024 CPI}
+  - {type: NFP, date: 2024-09-06, time: "08:30", note: August 2024 Employment Situation}
+  - {type: CPI, date: 2024-09-11, time: "08:30", note: August 2024 CPI}
+  - {type: FOMC, date: 2024-09-18, time: "14:00", note: September 17-18 meeting}
+  - {type: NFP, date: 2024-10-04, time: "08:30", note: September 2024 Employment Situation}
+  - {type: CPI, date: 2024-10-10, time: "08:30", note: September 2024 CPI}
+  - {type: NFP, date: 2024-11-01, time: "08:30", note: October 2024 Employment Situation}
+  - {type: FOMC, date: 2024-11-07, time: "14:00", note: November 6-7 meeting}
+  - {type: CPI, date: 2024-11-13, time: "08:30", note: October 2024 CPI}
+  - {type: NFP, date: 2024-12-06, time: "08:30", note: November 2024 Employment Situation}
+  - {type: CPI, date: 2024-12-11, time: "08:30", note: November 2024 CPI}
+  - {type: FOMC, date: 2024-12-18, time: "14:00", note: December 17-18 meeting}
+  # ---------------------------------------------------------------- 2025
+  - {type: NFP, date: 2025-01-10, time: "08:30", note: December 2024 Employment Situation}
+  - {type: CPI, date: 2025-01-15, time: "08:30", note: December 2024 CPI}
+  - {type: FOMC, date: 2025-01-29, time: "14:00", note: January 28-29 meeting}
+  - {type: NFP, date: 2025-02-07, time: "08:30", note: January 2025 Employment Situation}
+  - {type: CPI, date: 2025-02-12, time: "08:30", note: January 2025 CPI}
+  - {type: NFP, date: 2025-03-07, time: "08:30", note: February 2025 Employment Situation}
+  - {type: CPI, date: 2025-03-12, time: "08:30", note: February 2025 CPI}
+  - {type: FOMC, date: 2025-03-19, time: "14:00", note: March 18-19 meeting}
+  - {type: NFP, date: 2025-04-04, time: "08:30", note: March 2025 Employment Situation}
+  - {type: CPI, date: 2025-04-10, time: "08:30", note: March 2025 CPI}
+  - {type: NFP, date: 2025-05-02, time: "08:30", note: April 2025 Employment Situation}
+  - {type: FOMC, date: 2025-05-07, time: "14:00", note: May 6-7 meeting}
+  - {type: CPI, date: 2025-05-13, time: "08:30", note: April 2025 CPI}
+  - {type: NFP, date: 2025-06-06, time: "08:30", note: May 2025 Employment Situation}
+  - {type: CPI, date: 2025-06-11, time: "08:30", note: May 2025 CPI}
+  - {type: FOMC, date: 2025-06-18, time: "14:00", note: June 17-18 meeting}
+  - {type: NFP, date: 2025-07-03, time: "08:30", note: June 2025 Employment Situation}
+  - {type: CPI, date: 2025-07-15, time: "08:30", note: June 2025 CPI}
+  - {type: FOMC, date: 2025-07-30, time: "14:00", note: July 29-30 meeting}
+  - {type: NFP, date: 2025-08-01, time: "08:30", note: July 2025 Employment Situation}
+  - {type: CPI, date: 2025-08-12, time: "08:30", note: July 2025 CPI}
+  - {type: NFP, date: 2025-09-05, time: "08:30", note: August 2025 Employment Situation}
+  - {type: CPI, date: 2025-09-11, time: "08:30", note: August 2025 CPI}
+  - {type: FOMC, date: 2025-09-17, time: "14:00", note: September 16-17 meeting}
+  - {type: CPI, date: 2025-10-24, time: "08:30", note: September 2025 CPI (moved by the shutdown)}
+  - {type: FOMC, date: 2025-10-29, time: "14:00", note: October 28-29 meeting}
+  - {type: NFP, date: 2025-11-20, time: "08:30", note: September 2025 Employment Situation (moved from 2025-10-03 by the shutdown)}
+  - {type: FOMC, date: 2025-12-10, time: "14:00", note: December 9-10 meeting}
+  - {type: NFP, date: 2025-12-16, time: "08:30", note: November 2025 Employment Situation with October payrolls}
+  - {type: CPI, date: 2025-12-18, time: "08:30", note: November 2025 CPI (moved from 2025-12-10 by the shutdown)}
+  # ---------------------------------------------------------------- 2026
+  - {type: NFP, date: 2026-01-09, time: "08:30", note: December 2025 Employment Situation}
+  - {type: CPI, date: 2026-01-13, time: "08:30", note: December 2025 CPI}
+  - {type: FOMC, date: 2026-01-28, time: "14:00", note: January 27-28 meeting}
+  - {type: NFP, date: 2026-02-11, time: "08:30", note: January 2026 Employment Situation (moved from 2026-02-06)}
+  - {type: CPI, date: 2026-02-13, time: "08:30", note: January 2026 CPI (moved from 2026-02-11)}
+  - {type: NFP, date: 2026-03-06, time: "08:30", note: February 2026 Employment Situation}
+  - {type: CPI, date: 2026-03-11, time: "08:30", note: February 2026 CPI}
+  - {type: FOMC, date: 2026-03-18, time: "14:00", note: March 17-18 meeting}
+  - {type: NFP, date: 2026-04-03, time: "08:30", note: March 2026 Employment Situation}
+  - {type: CPI, date: 2026-04-10, time: "08:30", note: March 2026 CPI}
+  - {type: FOMC, date: 2026-04-29, time: "14:00", note: April 28-29 meeting}
+  - {type: NFP, date: 2026-05-08, time: "08:30", note: April 2026 Employment Situation}
+  - {type: CPI, date: 2026-05-12, time: "08:30", note: April 2026 CPI}
+  - {type: NFP, date: 2026-06-05, time: "08:30", note: May 2026 Employment Situation}
+  - {type: CPI, date: 2026-06-10, time: "08:30", note: May 2026 CPI}
+  - {type: FOMC, date: 2026-06-17, time: "14:00", note: June 16-17 meeting}
+  - {type: NFP, date: 2026-07-02, time: "08:30", note: June 2026 Employment Situation}
+  - {type: CPI, date: 2026-07-14, time: "08:30", note: June 2026 CPI}
+  - {type: FOMC, date: 2026-07-29, time: "14:00", note: July 28-29 meeting}
+  - {type: NFP, date: 2026-08-07, time: "08:30", note: July 2026 Employment Situation}
+  - {type: CPI, date: 2026-08-12, time: "08:30", note: July 2026 CPI}
+  - {type: NFP, date: 2026-09-04, time: "08:30", note: August 2026 Employment Situation}
+  - {type: CPI, date: 2026-09-11, time: "08:30", note: August 2026 CPI}
+  - {type: FOMC, date: 2026-09-16, time: "14:00", note: September 15-16 meeting}
+  - {type: NFP, date: 2026-10-02, time: "08:30", note: September 2026 Employment Situation}
+  - {type: CPI, date: 2026-10-14, time: "08:30", note: September 2026 CPI}
+  - {type: FOMC, date: 2026-10-28, time: "14:00", note: October 27-28 meeting}
+  - {type: NFP, date: 2026-11-06, time: "08:30", note: October 2026 Employment Situation}
+  - {type: CPI, date: 2026-11-10, time: "08:30", note: October 2026 CPI}
+  - {type: NFP, date: 2026-12-04, time: "08:30", note: November 2026 Employment Situation}
+  - {type: FOMC, date: 2026-12-09, time: "14:00", note: December 8-9 meeting}
+  - {type: CPI, date: 2026-12-10, time: "08:30", note: November 2026 CPI}

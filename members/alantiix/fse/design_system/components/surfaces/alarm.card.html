@@ -1,0 +1,15 @@
+<!-- @dsCard group="Components" viewport="700x330" name="Alarm states" subtitle="Banner tones, danger button, danger dialog — halts are louder than losses" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css"><style>body{padding:20px;background:var(--surface-page)}</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script></head><body><div id="root"></div>
+<script type="text/babel">
+const { Banner, Button, StatusDot, Badge } = window.FseDesignSystem_043819;
+ReactDOM.createRoot(document.getElementById('root')).render(<div style={{display:'grid',gap:12}}>
+<Banner tone="alarm" title="Runner halted" actions={<Button size="sm" variant="secondary">Review</Button>}>Kill switch: daily loss limit −$1,000.00. Positions flattened, entries blocked until fse clear.</Banner>
+<Banner tone="warning" title="OPERATOR: required">fills.costs.MNQ.exchange_fee has no value. Backtests exit 2.</Banner>
+<Banner tone="info" title="Paper Order_Mode">No order is sent to ProjectX.</Banner>
+<div style={{display:'flex',gap:12,alignItems:'center',flexWrap:'wrap'}}><Button variant="danger" icon="octagon-x">Halt and flatten</Button><Button variant="danger-outline" icon="trash-2">Delete run</Button><Badge variant="danger-solid">Halted</Badge><Badge mode="combine" dot/><StatusDot status="halted" label="Kill switch"/><span style={{font:'var(--type-small)',color:'var(--neg)'}}>−1.00 R loss stays Bear text</span></div>
+</div>);
+</script></body></html>

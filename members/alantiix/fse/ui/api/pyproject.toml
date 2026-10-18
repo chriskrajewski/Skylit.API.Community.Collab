@@ -1,0 +1,80 @@
+[build-system]
+requires = ["hatchling==1.32.4"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fse-ui"
+version = "0.1.0"
+description = "fse console API: the operator's web control plane for the futures strategy engine."
+requires-python = ">=3.14"
+# Runtime pins. The engine (skylit-futures-strategy-engine) is installed next to this
+# package from its own requirements.lock; shared packages use the engine's pins.
+# requirements.lock (this folder) holds the hashes: see the header for the command.
+dependencies = [
+    "fastapi==0.143.0",
+    "starlette==1.7.0",
+    "uvicorn==0.54.0",
+    "pyjwt[crypto]==2.15.1",
+    "python-multipart==0.0.32",
+    "httpx==0.28.1",
+    "boto3==1.43.108",
+    "pydantic==2.13.5",
+    "PyYAML==6.0.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "respx==0.23.1",
+    "moto[s3,ssm,ecs,logs]==5.2.3",
+    "ruff==0.16.10",
+    "mypy==2.4.0",
+]
+
+[project.scripts]
+fse-ui = "fse_ui.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fse_ui"]
+
+[tool.pytest.ini_options]
+minversion = "9.0"
+testpaths = ["tests"]
+pythonpath = ["."]
+filterwarnings = ["ignore::DeprecationWarning:fastapi.testclient", "ignore:Using `httpx`:DeprecationWarning"]
+addopts = ["-ra", "--strict-markers", "--strict-config"]
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"
+asyncio_default_test_loop_scope = "function"
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "SIM", "S"]
+ignore = ["S101"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["fse_ui"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S105", "S106", "S108", "S603", "S607"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+plugins = ["pydantic.mypy"]
+mypy_path = "src:../../src:../.."
+packages = ["fse_ui"]
+
+[[tool.mypy.overrides]]
+module = ["yaml", "boto3", "boto3.*", "botocore", "botocore.*"]
+ignore_missing_imports = true
+
+# The engine and research packages are checked by the engine's own strict mypy run.
+[[tool.mypy.overrides]]
+module = ["fse", "fse.*", "research", "research.*"]
+follow_imports = "silent"

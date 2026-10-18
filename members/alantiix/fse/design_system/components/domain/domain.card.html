@@ -1,0 +1,15 @@
+<!-- @dsCard group="Components" viewport="700x420" name="Finding card" subtitle="FindingCard — decision and premarket" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<style>body{padding:20px;background:var(--surface-page)}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.col{display:flex;flex-direction:column;gap:14px}.lbl{font:var(--type-micro);letter-spacing:var(--ls-caps);text-transform:uppercase;color:var(--text-disabled);width:72px;flex:none}</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script></head><body><div id="root"></div>
+<script type="text/babel">
+const { FindingCard } = window.FseDesignSystem_043819;
+function App(){ return <div style={{display:'grid',gridTemplateColumns:'1.3fr 1fr',gap:16,alignItems:'start'}}>
+<FindingCard card={{time:'10:35:00 ET',mode:'paper',regime:'Positive_Gamma',mapGrade:'B',trinity:'agree',maps:[{sym:'ES',king:'5900.00',ceiling:'5925.00',floor:'5850.00',spot:'5884.25'},{sym:'NQ',king:'20810.00',ceiling:'20900.00',floor:null,spot:'20774.50'}],setups:[{grade:'A_Plus',key:'MES gatekeeper_fade short 5910 tap 1'},{grade:'Alert_2R',key:'MES floor_ceiling_bounce long 5850 tap 1'},{grade:'Pass',key:'MNQ rug long 20700 tap 3',reasons:['tap_count','min_reward_risk','trinity_agreement']}],notListed:2,orders:'MES sell limit 5910.25 ×5',position:'short 5 MES @ 5910.25 · +0.84 R',watchUp:'5900.00',watchDown:'5875.00'}}/>
+<FindingCard card={{kind:'premarket',time:'09:20:00 ET',mode:'paper',regime:'Whipsaw',mapGrade:'C',trinity:null,maps:[{sym:'ES',king:'5905.00',ceiling:'5925.00',floor:'5850.00',spot:'5879.00'}]}}/>
+</div>; }
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script></body></html>

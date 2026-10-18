@@ -1,0 +1,12 @@
+# Every 30 minutes, so the cache is current before each 18:00 ET Globex day open
+# (and 2 minutes after boot). Installed by the fse-ui-host-bundle SSM document.
+[Unit]
+Description=fse cache sync every 30 minutes
+[Timer]
+OnBootSec=2min
+OnCalendar=*:00,30
+Persistent=true
+RandomizedDelaySec=20
+Unit=fse-cache-sync.service
+[Install]
+WantedBy=timers.target

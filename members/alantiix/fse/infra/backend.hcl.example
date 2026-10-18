@@ -1,0 +1,4 @@
+# Copy to backend.hcl (gitignored) and run:
+#   terraform init -backend-config=backend.hcl
+# The bootstrap stack prints the bucket name (output state_bucket_name).
+bucket = "skylit-fse-tfstate-<account>-us-east-1"

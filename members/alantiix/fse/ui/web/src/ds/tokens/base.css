@@ -1,0 +1,7 @@
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;background:var(--surface-page);color:var(--text-primary);font:var(--type-body);font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+a{color:var(--text-primary);text-decoration:underline;text-decoration-color:var(--line-3);text-underline-offset:3px}
+a:hover{color:var(--accent);text-decoration-color:var(--accent)}
+::selection{background:var(--signal-wash-2);color:var(--text-primary)}
+:focus-visible{outline:none;box-shadow:var(--focus-ring)}
+::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:var(--line-2);border:3px solid var(--surface-page);border-radius:10px}::-webkit-scrollbar-track{background:transparent}

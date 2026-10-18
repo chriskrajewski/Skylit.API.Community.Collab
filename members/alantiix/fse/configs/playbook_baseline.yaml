@@ -1,0 +1,513 @@
+# Playbook_Baseline (Req 17.9): a starting Strategy_Config made of the Config_Schema
+# defaults (src/fse/config/schema/), generated with fse.config.printer. It takes no
+# position on whether any setting has edge. Tune it for your own research.
+#
+# - Paper Order_Mode: the in-process Paper_Broker; no broker order is ever sent.
+# - Every key is written out, even where it equals the schema default.
+# - "OPERATOR: required" marks a value the schema leaves without a default. The
+#   Config_Loader rejects this file until the Operator enters it.
+# - Never put an account name, account id or credential in this file (Req 17.5).
+
+schema_version: 1
+config_id: playbook_baseline
+order_mode: paper
+time:
+  decision_cadence_s: 60
+  timezone: America/New_York
+data:
+  symbols:
+  - SPX
+  - SPY
+  - QQQ
+  - NDX
+  - NDXP
+  heatmap_view:
+    max_strikes: 92
+    max_expirations: 5
+    expirations: null
+    include_empty: false
+  regime_symbol: SPX
+  es_source_symbol: SPX
+  nq_source_symbol: QQQ
+  nq_sources:
+  - QQQ
+  - NDX
+  - NDXP
+  instruments:
+    es_levels: MES
+    nq_levels: MNQ
+  velocity_window_s: 60
+nodes:
+  node_fraction: 0.2
+  gatekeeper_fraction: 0.3
+  air_pocket_min_width_pct: 0.5
+  lookout_pct: 1.0
+  decay_fraction: 0.2
+  dormant_distance_pct: 3.5
+  sloppy_seconds:
+    window_min: 15
+    fraction: 0.1
+  clustering:
+    enabled: false
+    es_width_pts: 5.0
+# OPERATOR: required: regime.min_abs_value (Req 7.4, no default). Calibrate it from your own
+# data, e.g. `fse calibrate regime-min-abs --start <date> --end <date> --percentile <p>`,
+# and add it under `regime:` below.
+regime:
+  regime_distance_pct: 1.0
+  vanna_multiple: 2.0
+  whipsaw_pct: 15.0
+  vix_condition:
+    enabled: true
+    pct: 5.0
+    intraday_source: false
+  grade:
+    major_fraction: 0.5
+    floor_ceiling_ratio: 1.5
+levels:
+  methods:
+    SPY: ratio
+    NDX: ratio
+    NDXP: ratio
+  es_half_width_pts: 5.0
+  qqq_half_width_usd: 0.5
+  max_price_gap_s: 120
+chart:
+  pivot_len:
+    '60': 3
+    '240': 3
+  swings_kept: 5
+  bos_pivot_len:
+    '1': 3
+    '5': 3
+  sweep_ticks: 2
+  candle_timeframe_s: 60
+  sweep_timeframe_s: 60
+patterns:
+  gatekeeper_fade:
+    enabled: true
+    metric: gamma
+    entry_offset_ticks: 0
+    stop_rule: null
+    fixed_stop_ticks: 8
+    invalidation: level
+    stop_lookout_pct: 1.0
+    arming:
+      es_pts: 10.0
+      nq_qqq_usd: 1.0
+  floor_ceiling_bounce:
+    enabled: true
+    metric: gamma
+    entry_offset_ticks: 0
+    stop_rule: null
+    fixed_stop_ticks: 8
+    invalidation: level
+    stop_lookout_pct: 1.0
+    arming:
+      es_pts: 10.0
+      nq_qqq_usd: 1.0
+  floor_ceiling_bounce_empty_basement:
+    enabled: true
+    metric: gamma
+    entry_offset_ticks: 0
+    stop_rule: null
+    fixed_stop_ticks: 8
+    invalidation: level
+    stop_lookout_pct: 1.0
+    arming:
+      es_pts: 10.0
+      nq_qqq_usd: 1.0
+  beach_ball:
+    enabled: true
+    metric: gamma
+    entry_offset_ticks: 0
+    stop_rule: null
+    fixed_stop_ticks: 8
+    invalidation: level
+    stop_lookout_pct: 1.0
+    arming:
+      es_pts: 10.0
+      nq_qqq_usd: 1.0
+    major_fraction: 0.5
+  rug:
+    enabled: true
+    metric: gamma
+    entry_offset_ticks: 0
+    stop_rule: null
+    fixed_stop_ticks: 8
+    invalidation: level
+    stop_lookout_pct: 1.0
+    arming:
+      es_pts: 10.0
+      nq_qqq_usd: 1.0
+    stack_pct: 0.5
+  reverse_rug:
+    enabled: true
+    metric: gamma
+    entry_offset_ticks: 0
+    stop_rule: null
+    fixed_stop_ticks: 8
+    invalidation: level
+    stop_lookout_pct: 1.0
+    arming:
+      es_pts: 10.0
+      nq_qqq_usd: 1.0
+    stack_pct: 0.5
+  whipsaw_fade:
+    enabled: true
+    metric: gamma
+    entry_offset_ticks: 0
+    stop_rule: null
+    fixed_stop_ticks: 8
+    invalidation: level
+    stop_lookout_pct: 1.0
+    arming:
+      es_pts: 10.0
+      nq_qqq_usd: 1.0
+  trend_follow:
+    enabled: true
+    metric: gamma
+    entry_offset_ticks: 0
+    stop_rule: null
+    fixed_stop_ticks: 8
+    invalidation: level
+    stop_lookout_pct: 1.0
+    arming:
+      es_pts: 10.0
+      nq_qqq_usd: 1.0
+    trend_min_pct: 1.0
+    max_intermediate: 1
+gates:
+  order:
+  - stale_map
+  - map_grade
+  - midpoint
+  - deflection_band
+  - chart_confluence
+  - stdev_fib_zone
+  - dark_pool_confluence
+  - trinity_agreement
+  - candle_color
+  - tap_count
+  - third_gatekeeper_test
+  - weekly_node_tests
+  - sloppy_seconds
+  - air_pocket_fade
+  - min_reward_risk
+  - opposition_inside_target
+  - fomo_travel
+  - open_shuffle
+  - entry_cutoff
+  - late_session_chase
+  - news_window
+  - vix_gap
+  - regime_match
+  - dormant_node
+  - gatekeepers_on_path
+  - node_growth_divergence
+  - kill_switch_lockout
+  fade_detectors:
+  - gatekeeper_fade
+  - floor_ceiling_bounce
+  - floor_ceiling_bounce_empty_basement
+  - beach_ball
+  - whipsaw_fade
+  stale_map:
+    enabled: true
+    max_snapshot_age_s: 90
+  map_grade:
+    enabled: true
+    fail_grades:
+    - F_Map
+  midpoint:
+    enabled: true
+    lo: 0.33
+    hi: 0.67
+  deflection_band:
+    enabled: true
+  chart_confluence:
+    enabled: true
+  stdev_fib_zone:
+    enabled: false
+    zones:
+    - near: -2.0
+      far: -2.5
+    - near: -3.5
+      far: -4.5
+  dark_pool_confluence:
+    enabled: false
+    min_notional_usd: 1000000.0
+    lookback_sessions: 5
+    es_ticker: SPY
+    nq_ticker: QQQ
+  trinity_agreement:
+    enabled: true
+    min_agree: 2
+    empty_basement_exception: true
+  candle_color:
+    enabled: true
+  tap_count:
+    enabled: true
+    max_tap_seq: 2
+  third_gatekeeper_test:
+    enabled: true
+    fail_at_test: 3
+  weekly_node_tests:
+    enabled: true
+    max_tests: 2
+  sloppy_seconds:
+    enabled: true
+  air_pocket_fade:
+    enabled: true
+    max_depth_pts: 0.0
+  min_reward_risk:
+    enabled: true
+    min: 3.0
+    alert_min: 2.0
+  opposition_inside_target:
+    enabled: true
+    fraction: 0.85
+    window_r: 3.0
+  fomo_travel:
+    enabled: true
+    max_fraction: 0.6
+  open_shuffle:
+    enabled: true
+    min_minutes: 15
+  entry_cutoff:
+    enabled: true
+    cutoff: '15:25'
+  late_session_chase:
+    enabled: true
+    start: '15:30'
+    end: '16:00'
+  news_window:
+    enabled: true
+    minutes: 5
+    event_types:
+    - CPI
+    - NFP
+    - FOMC
+  vix_gap:
+    enabled: true
+    pct: 15.0
+    until: '12:00'
+  regime_match:
+    enabled: true
+    allowed:
+      gatekeeper_fade:
+      - Positive_Gamma
+      - Whipsaw
+      floor_ceiling_bounce:
+      - Positive_Gamma
+      - Whipsaw
+      floor_ceiling_bounce_empty_basement:
+      - Positive_Gamma
+      - Whipsaw
+      beach_ball:
+      - Positive_Gamma
+      - Whipsaw
+      rug:
+      - Positive_Gamma
+      - Negative_Gamma
+      reverse_rug:
+      - Positive_Gamma
+      - Negative_Gamma
+      whipsaw_fade:
+      - Whipsaw
+      trend_follow:
+      - Negative_Gamma
+      - Vanna_Dominant
+  dormant_node:
+    enabled: true
+  gatekeepers_on_path:
+    enabled: true
+    fail_at: 2
+  node_growth_divergence:
+    enabled: true
+    fail_at_pct: 20.0
+  kill_switch_lockout:
+    enabled: true
+exits:
+  global:
+    mode: opposition_or_fixed_r
+    stop_rule: one_node_beyond
+  per_regime:
+    Positive_Gamma:
+      mode: next_node
+      stop_rule: one_node_beyond
+    Negative_Gamma: null
+    Vanna_Dominant: null
+    Whipsaw: null
+    Structureless: null
+  modes:
+    fixed_r:
+      enabled: true
+      r_multiple: 3.0
+    next_node:
+      enabled: true
+    tp1_partial_be:
+      enabled: false
+      tp1:
+        rule: r
+        r_multiple: 1.5
+      tp2:
+        rule: node
+        r_multiple: 3.0
+      tp1_fraction: 0.5
+    opposition_or_fixed_r:
+      enabled: true
+      r_multiple: 3.0
+      fraction: 0.85
+    trailing:
+      enabled: false
+      mode: node_to_node
+      ticks: 40
+  breakeven:
+    enabled: true
+    trigger_r: 1.0
+    offset_ticks: 1
+  node_plus_fixed:
+    es_pts: 5.0
+    nq_pts: 20.0
+orders:
+  flatten_time: '15:55'
+  early_close_flatten_lead_min: 30
+  max_open: 1
+  max_age_min: null
+  cancel_triggers:
+    king_flip: true
+    source_node_gone: true
+    sign_flip: true
+    stdev_leg_dropped: true
+    opposition_in_target: true
+  invalidation:
+    king_flip: exit_market
+    source_node_gone: exit_market
+    sign_flip: exit_market
+    stdev_leg_dropped: hold
+    opposition_in_target: hold
+fills:
+  trade_through_ticks: 1
+  slippage_ticks: 1
+  # OPERATOR: required: fills.costs.<instrument>.commission and .exchange_fee for each
+  # traded instrument, quoted dollars per contract per side from "0.00" to "25.00", with
+  # no default (Req 13.8). Enter your broker's current values, as
+  # `MES: {commission: "<usd>", exchange_fee: "<usd>"}`.
+  costs:
+    MES: {} # OPERATOR: required
+    MNQ: {} # OPERATOR: required
+sizing:
+  mode: fixed_contracts
+  fixed:
+    MES: 5
+    MNQ: 3
+    ES: 1
+    NQ: 1
+  risk_usd: '375'
+  big_win:
+    usd: '1200'
+    r: 3.0
+    reduced:
+      MES: 3
+      MNQ: 2
+      ES: 1
+      NQ: 1
+  trinity_size_down:
+    enabled: true
+    fraction: 0.5
+  vix_gap:
+    enabled: true
+    pct: 15.0
+  micro_equivalent_limit: 50
+kill_switches:
+  max_trades:
+    enabled: true
+    max: 3
+  max_losers:
+    enabled: true
+    limit: 2
+  consecutive_losers:
+    enabled: true
+    limit: 3
+  red_day:
+    enabled: true
+    threshold_usd: '0'
+  daily_profit_cap:
+    enabled: true
+    cap_usd: '1200'
+  internal_daily_loss_stop:
+    enabled: false
+    multiple: 2.0
+  losing_trade_tolerance_usd: '0'
+account:
+  starting_balance:
+    value: '50000.00'
+  profit_target:
+    enabled: true
+    value: '3000.00'
+  maximum_loss_limit:
+    enabled: true
+    value: '2000.00'
+  daily_loss_limit:
+    enabled: true
+    value: '1000.00'
+  consistency_target:
+    enabled: true
+    pct: 55.0
+  position_cap:
+    enabled: true
+    micro_equivalents: 50
+  flat_deadline: '16:10'
+  early_close_offset_min: 15
+live:
+  refresh_interval_s: 5
+  mode: polling
+  live_max_snapshot_age_s: 30
+  levels_compare_interval_s: 60
+  run_window:
+    start: 09:00
+    end: '16:00'
+  stop_confirm_s: 5
+  lookup_timeout_s: 5
+  outage_s: 30
+  ignored_instruments:
+  - MGC
+  - SIL
+  expected_contracts:
+    MES: CON.F.US.MES.Z26
+    MNQ: CON.F.US.MNQ.Z26
+    ES: null
+    NQ: null
+notify:
+  sinks:
+  - console
+  - file
+  interval_min: 5
+  premarket: 09:00
+  alerts_2r: true
+  narrator:
+    enabled: false
+    base_url: null
+    model: null
+    timeout_s: 10
+    max_chars: 1500
+reporting:
+  primary_win_rate: a
+  scratch_tolerance_r: 0.1
+  min_sample_trades: 30
+  bootstrap_resamples: 5000
+  reference_win_rate: 80.0
+  shadow_min_sample: 30
+experiments:
+  holdout_fraction: 0.2
+  ranking_objective: combine_pass_probability
+  walkforward:
+    train: 60
+    test: 20
+    objective: expectancy
+    min_trades: 30
+  montecarlo:
+    paths: 10000
+    max_days: 60
+    min_sessions: 40

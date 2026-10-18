@@ -1,0 +1,29 @@
+# Deny by default: only what the image runs is sent to the build.
+*
+
+!pyproject.toml
+!requirements.lock
+!README.md
+!LICENSE
+!src/**
+!configs/**
+!calendars/**
+!docker/**
+# Read at runtime: the Narrator system prompt (fse.notify.narrator) and the
+# rules table `fse drafts build` reads by default.
+!prompts/narrator.md
+!docs/rules_table.md
+# Plugins and the modules they import: add one `!research/<name>/**` line per plugin.
+!research/__init__.py
+# Never in the image, even inside an allowed folder.
+research/**/tests/
+research/**/.agents/
+**/__pycache__/
+**/*.pyc
+.env
+.env.*
+**/.env
+**/.env.*
+infra/
+.venv/
+.agents/

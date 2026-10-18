@@ -1,0 +1,14 @@
+# Upload closed days of /data/recordings/dataplane to S3 and prune them locally
+# (fse-offload-recordings.sh). Installed by the fse-ui-host-bundle SSM document.
+[Unit]
+Description=fse recordings offload (closed days to S3, local prune)
+Wants=network-online.target
+After=network-online.target data.mount
+RequiresMountsFor=/data
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/fse/host.env
+Nice=10
+IOSchedulingClass=idle
+ExecStart=/usr/local/bin/fse-offload-recordings.sh
+TimeoutStartSec=3700

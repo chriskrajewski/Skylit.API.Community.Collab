@@ -1,0 +1,14 @@
+# Deny by default: only what the fse-ui image builds from is sent to the build.
+*
+!api/pyproject.toml
+!api/requirements.lock
+!api/src/**
+!web/**
+# Never in the image, even inside an allowed folder.
+web/node_modules
+web/dist
+web/test-results
+web/playwright-report
+web/e2e
+**/__pycache__
+**/.env*

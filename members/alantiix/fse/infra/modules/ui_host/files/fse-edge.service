@@ -1,0 +1,30 @@
+# fse console edge (Caddy, fse-edge image) on :443, reachable from CloudFront
+# only. Checks X-Origin-Verify and proxies to fse-ui on 127.0.0.1:8080.
+# Installed by the fse-ui-host-bundle SSM document (modules/ui_host).
+[Unit]
+Description=fse console edge
+Wants=network-online.target
+After=docker.service network-online.target data.mount fse-ui.service
+Requires=docker.service
+RequiresMountsFor=/data
+StartLimitIntervalSec=1h
+StartLimitBurst=5
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/fse/host.env
+EnvironmentFile=/etc/fse/ui.env
+Environment=HOME=/root
+Environment=DOCKER_CONFIG=/root/.docker
+RuntimeDirectory=fse-edge
+RuntimeDirectoryMode=0700
+ExecStartPre=-/usr/bin/docker rm -f fse-edge
+ExecStartPre=/usr/local/bin/fse-ui-fetch-env.sh edge
+ExecStart=/usr/local/bin/fse-edge-start.sh
+ExecStop=/usr/bin/docker stop -t 10 fse-edge
+Restart=on-failure
+RestartSec=10s
+TimeoutStopSec=45
+
+[Install]
+WantedBy=multi-user.target

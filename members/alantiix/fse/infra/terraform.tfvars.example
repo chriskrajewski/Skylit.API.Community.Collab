@@ -1,0 +1,36 @@
+# Copy to terraform.tfvars (gitignored) and fill in.
+alert_email = "you@example.com"
+
+# Defaults, shown for reference:
+# region                     = "us-east-1"
+# enable_ui                  = false
+# adopt_existing_data_bucket = true
+# runner_instance_type       = "t4g.small"
+# data_volume_size_gb        = 30
+# batch_cpu                  = 8192
+# batch_memory               = 32768
+# batch_ephemeral_gb         = 100
+# fault_backoff_s            = 900
+
+# Use an existing VPC instead of creating the dedicated fse VPC (10.40.0.0/16).
+# The subnets must route 0.0.0.0/0 to an internet gateway (no NAT). Only the
+# fse-runner and fse-batch security groups are created in that VPC.
+# existing_vpc_id     = "vpc-0123456789abcdef0"
+# existing_subnet_ids = ["subnet-0123456789abcdef0"]
+# Console behind CloudFront and Cognito (https://<ui_subdomain>.<domain_name>).
+# operator_email is required with enable_ui = true; with the UI on the host
+# uses ui_runner_instance_type (t4g.medium when unset), not runner_instance_type.
+# enable_ui               = true
+# operator_email          = "operator@example.com"
+# ui_runner_instance_type = "t4g.medium"
+# domain_name             = "example.com"
+# ui_subdomain            = "fse"
+# origin_secret_version   = 1
+
+# Plugin-orders master switch (/fse/control/plugin_orders, Terraform only).
+# true lets the console switch a broker_orders plugin to Practice orders; it
+# needs enable_ui = true and the day you checked the Topstep automation terms
+# (topstep_terms_verified_on defaults to 2026-10-13; verify the terms yourself and set your own date).
+# After the apply that sets true, use Live -> Runner -> Restart.
+# plugin_orders_enabled     = true
+# topstep_terms_verified_on = "2026-10-13"

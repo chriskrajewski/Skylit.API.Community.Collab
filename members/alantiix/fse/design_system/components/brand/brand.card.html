@@ -1,0 +1,17 @@
+<!-- @dsCard group="Components" viewport="700x240" name="Brand primitives" subtitle="Wordmark, PoweredBy, StatusDot, Kbd, Icon" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<style>body{padding:20px;background:var(--surface-page)}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.col{display:flex;flex-direction:column;gap:14px}.lbl{font:var(--type-micro);letter-spacing:var(--ls-caps);text-transform:uppercase;color:var(--text-disabled);width:72px;flex:none}</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script></head><body><div id="root"></div>
+<script type="text/babel">
+const { Wordmark, StatusDot, Kbd, Icon, PoweredBy } = window.FseDesignSystem_043819;
+function App(){ return <div className="col">
+<div className="row" style={{gap:28}}><Wordmark size="lg"/><Wordmark size="sm"/><Wordmark lockup={false}/></div>
+<div className="row" style={{gap:24}}><PoweredBy size="md"/><PoweredBy/><PoweredBy suffix=""/></div>
+<div className="row" style={{gap:20}}><StatusDot status="live" label="Heatseeker stream"/><StatusDot status="paper" label="Paper broker"/><StatusDot status="ok" label="ProjectX"/><StatusDot status="warning" label="Stale map"/><StatusDot status="idle" label="Narrator off"/><StatusDot status="halted" label="Kill switch"/></div>
+<div className="row" style={{gap:16,color:'var(--text-secondary)'}}>{['activity','radio','history','flask-conical','filter','layers','inbox','sliders-horizontal','git-branch','file-text','play','octagon-x','crosshair','radar'].map(n=><Icon key={n} name={n} size={16}/>)}<span style={{display:'flex',gap:3}}><Kbd>⌘</Kbd><Kbd>K</Kbd></span></div>
+</div>; }
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script></body></html>

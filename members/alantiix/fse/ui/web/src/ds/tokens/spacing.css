@@ -1,0 +1,8 @@
+:root{
+--sp-0:0;/* @kind spacing */--sp-1:2px;--sp-2:4px;--sp-3:6px;--sp-4:8px;--sp-5:12px;--sp-6:16px;--sp-7:20px;--sp-8:24px;--sp-9:32px;--sp-10:48px;--sp-11:64px;
+--radius-0:0;/* @kind radius */--radius-1:2px;--radius-2:4px;--radius-3:6px;--radius-pill:999px;
+--control-sm:24px;--control-md:28px;--control-lg:34px;
+--row-dense:26px;--row-default:32px;
+--topbar-h:44px;--sidenav-w:220px;--rail-w:48px;
+--gutter:var(--sp-6);
+}

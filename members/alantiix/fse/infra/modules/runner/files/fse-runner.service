@@ -1,0 +1,29 @@
+# fse plugin runner (fse run) in the fse container image.
+# Phase 2: the web UI becomes a second unit next to this one.
+[Unit]
+Description=fse plugin runner
+Wants=network-online.target
+After=docker.service network-online.target data.mount
+Requires=docker.service
+RequiresMountsFor=/data
+# Six failed starts within two hours: stop retrying and mail once.
+StartLimitIntervalSec=2h
+StartLimitBurst=6
+OnFailure=fse-runner-alert.service
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/fse/host.env
+Environment=HOME=/root
+Environment=DOCKER_CONFIG=/root/.docker
+ExecStartPre=-/usr/bin/docker rm -f fse-runner
+ExecStartPre=/usr/local/bin/fse-fetch-secrets.sh
+ExecStart=/usr/local/bin/fse-start.sh
+ExecStop=/usr/bin/docker stop -t 60 fse-runner
+ExecStopPost=/usr/local/bin/fse-alert.sh
+Restart=on-failure
+RestartSec=30s
+TimeoutStopSec=90
+
+[Install]
+WantedBy=multi-user.target

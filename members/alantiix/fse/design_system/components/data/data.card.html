@@ -1,0 +1,23 @@
+<!-- @dsCard group="Components" viewport="700x400" name="Data display" subtitle="Badge, Stat, DataTable, KeyValue, Sparkline, MeterBar, LevelLadder" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<style>body{padding:20px;background:var(--surface-page)}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.col{display:flex;flex-direction:column;gap:14px}.lbl{font:var(--type-micro);letter-spacing:var(--ls-caps);text-transform:uppercase;color:var(--text-disabled);width:72px;flex:none}</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script></head><body><div id="root"></div>
+<script type="text/babel">
+const { Badge, Stat, DataTable, KeyValue, Sparkline, MeterBar, LevelLadder } = window.FseDesignSystem_043819;
+function App(){ const cum=[0,1,.2,1.4,3.1,2.1,1.6,4.6,4.1,3.9,6.9,6.4,5.4,8.4,7.9];
+return <div className="col">
+<div className="row"><Badge grade="A_Plus"/><Badge grade="Alert_2R"/><Badge grade="Pass"/><Badge mode="paper" dot/><Badge mode="practice" dot/><Badge mode="combine" dot/><Badge variant="outline">Positive_Gamma</Badge><Badge side="long"/><Badge side="short"/><Badge variant="warning">Operator</Badge><Badge variant="danger-solid">Halted</Badge></div>
+<div style={{display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr)) 140px',gap:16,alignItems:'end'}}>
+<Stat label="Win rate" value="44.7" unit="%" sub="38 trades"/><Stat label="Expectancy" value="+0.31" unit="R" tone="pos" sub="CI 0.08 – 0.54"/><Stat label="Max DD" value="−4.20" unit="R" tone="neg"/><Stat label="Combine pass" value="0.1840"/><Sparkline values={cum} width={140} height={36} fill tone="auto"/>
+</div>
+<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+<div style={{border:'1px solid var(--border-subtle)',borderRadius:6}}><LevelLadder spot={5884.25} levels={[{kind:'ceiling',level:5925,strike:5930,value:820},{kind:'gatekeeper',level:5910,strike:5915,value:300},{kind:'king',level:5900,strike:5905,value:1400},{kind:'air',level:5866,strike:'—',value:90},{kind:'floor',level:5850,strike:5855,value:610}]}/></div>
+<div className="col" style={{gap:4}}><MeterBar label="stale_map" value={412} max={1830} labelWidth={150}/><MeterBar label="min_reward_risk" value={355} max={1830} labelWidth={150}/><MeterBar label="tap_count" value={208} max={1830} labelWidth={150}/><MeterBar label="dark_pool_confluence" value={0} max={1830} tone="muted" display="off" labelWidth={150}/><MeterBar label="accepted" value={38} max={1830} tone="bull" labelWidth={150}/>
+<div style={{height:8}}/><KeyValue items={[['config','playbook_baseline'],['seed','1'],['sessions','248']]}/></div>
+</div>
+</div>; }
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script></body></html>

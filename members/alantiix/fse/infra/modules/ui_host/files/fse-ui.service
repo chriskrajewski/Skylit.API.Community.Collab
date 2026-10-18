@@ -1,0 +1,29 @@
+# fse console API (fse-ui image) on 127.0.0.1:8080; fse-edge fronts it.
+# Installed by the fse-ui-host-bundle SSM document (modules/ui_host).
+[Unit]
+Description=fse console API
+Wants=network-online.target
+After=docker.service network-online.target data.mount
+Requires=docker.service
+RequiresMountsFor=/data
+StartLimitIntervalSec=1h
+StartLimitBurst=5
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/fse/host.env
+EnvironmentFile=/etc/fse/ui.env
+Environment=HOME=/root
+Environment=DOCKER_CONFIG=/root/.docker
+RuntimeDirectory=fse-ui
+RuntimeDirectoryMode=0700
+ExecStartPre=-/usr/bin/docker rm -f fse-ui
+ExecStartPre=/usr/local/bin/fse-ui-fetch-env.sh ui
+ExecStart=/usr/local/bin/fse-ui-start.sh
+ExecStop=/usr/bin/docker stop -t 30 fse-ui
+Restart=on-failure
+RestartSec=10s
+TimeoutStopSec=45
+
+[Install]
+WantedBy=multi-user.target
